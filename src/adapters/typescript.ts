@@ -52,7 +52,22 @@ import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
+const JAVASCRIPT_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
+
+/** The LSP language id tsserver expects for a file: a JavaScript file opened as "typescript" is parsed as TypeScript, is not the file the project knows, and every later query about it fails. */
+function languageIdOf(file: string): "typescript" | "typescriptreact" | "javascript" | "javascriptreact" {
+  const extension = extensionOf(file);
+  if (extension === ".tsx") return "typescriptreact";
+  if (extension === ".jsx") return "javascriptreact";
+  return JAVASCRIPT_EXTENSIONS.has(extension) ? "javascript" : "typescript";
+}
+
+/** The extension a synthetic document beside `file` takes, so the project that includes `file` includes the synthetic too: a `.ts` probe beside a `.mjs` module lands in an inferred project the references query never sees. */
+function syntheticExtensionBeside(file: string): string {
+  const extension = extensionOf(file);
+  return JAVASCRIPT_EXTENSIONS.has(extension) ? extension : ".ts";
+}
 
 export const TYPESCRIPT_LADDER: Ladder = {
   top: "visibility-choked",
@@ -319,7 +334,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private open(file: string, text?: string): void {
     if (this.opened.has(file)) return;
     const content = text ?? readFileSync(join(this.root, file), "utf8");
-    this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: "typescript", version: 1, text: content } });
+    this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: languageIdOf(file), version: 1, text: content } });
     this.opened.add(file);
     this.versions.set(file, 1);
   }
@@ -681,10 +696,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private async refusedByCompiler(client: JsonRpcClient, protectedThing: Definition, name: string): Promise<Refutation> {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
-    const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
+    const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}${syntheticExtensionBeside(protectedThing.file)}`;
     const text = `import { ${name} } from "./${base}";\nexport const coherenceRefutation = ${name};\n`;
     this.diagnostics.delete(synthetic);
-    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text } });
+    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: languageIdOf(synthetic), version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
     try {
@@ -721,9 +736,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, name: string, exempt?: string): Promise<Refutation> {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
-    const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
+    const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}${syntheticExtensionBeside(protectedThing.file)}`;
     const reExport = `export { ${name} } from "./${base}";\n`;
-    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text: reExport } });
+    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: languageIdOf(synthetic), version: 1, text: reExport } });
     this.lineCache.set(synthetic, reExport.split("\n"));
     this.symbolCache.set(synthetic, []);
     this.probes.add(synthetic);
@@ -737,11 +752,11 @@ export class TypeScriptAdapter implements LanguageAdapter {
     expected.push({ what: `a re-export of ${name} from the unsaved document ${synthetic}`, file: synthetic, line: 1 });
     // Where the chokepoint governs only references from outside a folder, a plain use from outside it must still be a bypass.
     const beside = exempt === undefined ? undefined : outsideOfFolder(exempt);
-    const outside = beside === undefined ? undefined : `${beside}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
+    const outside = beside === undefined ? undefined : `${beside}coherence-refutation-${randomBytes(4).toString("hex")}${syntheticExtensionBeside(protectedThing.file)}`;
     if (outside !== undefined) {
       const specifier = `./${relative(dirname(outside), protectedThing.file).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
       const use = `import { ${name} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
-      client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(outside), languageId: "typescript", version: 1, text: use } });
+      client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(outside), languageId: languageIdOf(outside), version: 1, text: use } });
       this.lineCache.set(outside, use.split("\n"));
       this.symbolCache.set(outside, []);
       this.probes.add(outside);
