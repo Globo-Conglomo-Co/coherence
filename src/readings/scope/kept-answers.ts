@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
-import { resolveSpecifier } from "../../adapters/typescript.ts";
+import { specifierCandidates } from "../../adapters/typescript.ts";
 import type { KeptReport } from "./model.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
@@ -180,10 +180,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
     for (const token of text.match(TOKEN) ?? []) tokens.add(token);
     if (language === "typescript") {
       for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        const target = resolveSpecifier(file, specifier!);
-        if (target === undefined) continue;
-        const stripped = target.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "");
-        for (const candidate of [target, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}.js`, `${stripped}/index.ts`]) modules.add(candidate);
+        for (const candidate of specifierCandidates(file, specifier!)) modules.add(candidate);
       }
     } else {
       for (const [, dots, dotted] of text.matchAll(PY_STAR)) {

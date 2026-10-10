@@ -132,3 +132,29 @@ test("grades on JavaScript: broken with a bypass, then a pass once the bypass is
   assert.equal(hidden.verdict, "not run", hidden.reason);
   assert.match(hidden.reason, /coherence-refutation-[0-9a-f]+\.mjs importing HIDDEN drew no diagnostic from the compiler/, "the account names the .mjs synthetic and the missing diagnostic");
 });
+
+test("a TypeScript project that tracks its compiled output: the seed, the resolution and the cold-start text search stay on the TypeScript source", { timeout: 120_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-tracked-dist-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  // `dist/` sorts before `src/` in the walk; `include` names only src. Both copies declare `widget`.
+  put("tsconfig.json", `{ "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true }, "include": ["src"] }`);
+  put("dist/foo.js", "export const widget = 1;\n");
+  put("dist/bar.js", 'import { widget } from "./foo.js";\nexport const bar = widget;\n');
+  put("src/foo.ts", "export const widget: number = 1;\n");
+  put("src/bar.ts", 'import { widget } from "./foo.js";\nexport const bar: number = widget;\n');
+  const fresh = new TypeScriptAdapter(dir);
+  try {
+    const bare = (await fresh.resolve("widget", hint)) as { ok: boolean; definition?: import("../adapters/adapter.ts").Definition; reason?: string };
+    assert.equal(bare.ok, true, bare.reason);
+    assert.equal(bare.definition!.file, "src/foo.ts", "the bare name resolves to the source, not the compiled copy the walk lists first");
+    const sites = await fresh.references(bare.definition!);
+    assert.ok(sites.every((s) => s.file.startsWith("src/")), `every reference is in src/: ${sites.map((s) => s.file).join(", ")}`);
+    assert.ok(sites.some((s) => s.file === "src/bar.ts"), "the .js specifier in bar.ts reaches foo.ts");
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

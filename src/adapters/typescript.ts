@@ -52,8 +52,26 @@ import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
+const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
 const JAVASCRIPT_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
+const SOURCE_EXTENSIONS = new Set([...TYPESCRIPT_EXTENSIONS, ...JAVASCRIPT_EXTENSIONS]);
+
+/**
+ * The sources the project is written in: when any TypeScript source is in the
+ * walk, only the TypeScript sources, since a JavaScript file beside them is
+ * compiled output a repository tracks (`dist/`, `lib/`) or a loose script,
+ * and a seed or a text search that reaches for it lands in an inferred
+ * project around the compiled copy; a project with no TypeScript source is
+ * written in JavaScript, and those files are its sources. A mixed project
+ * that compiles with `allowJs` still has a TypeScript seed, and the project
+ * that seed loads includes its JavaScript modules, so their symbols resolve
+ * through the server rather than through this list.
+ */
+export function projectSources(files: readonly string[]): string[] {
+  const sources = files.filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel));
+  const typescript = sources.filter((rel) => TYPESCRIPT_EXTENSIONS.has(extensionOf(rel)));
+  return typescript.length > 0 ? typescript : sources;
+}
 
 /** The LSP language id tsserver expects for a file: a JavaScript file opened as "typescript" is parsed as TypeScript, is not the file the project knows, and every later query about it fails. */
 function languageIdOf(file: string): "typescript" | "typescriptreact" | "javascript" | "javascriptreact" {
@@ -137,7 +155,7 @@ function walkedFiles(root: string): string[] {
  * file of the walk.
  */
 export function seedFile(files: readonly string[]): string | undefined {
-  const sources = files.filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel));
+  const sources = projectSources(files);
   const components = [...new Set(files.filter((rel) => rel.endsWith(".spec.md")).map((rel) => (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ".")))].filter((f) => f !== ".");
   return sources.find((rel) => components.some((folder) => rel.startsWith(`${folder}/`))) ?? sources[0];
 }
@@ -195,16 +213,39 @@ export function sourceFilesUnder(root: string): string[] {
   return walkedFiles(root).filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)));
 }
 
-/** The file a relative module specifier names, project-relative, or undefined when it is a package or points outside. */
-export function resolveSpecifier(from: string, specifier: string): string | undefined {
-  if (!specifier.startsWith(".")) return undefined;
+/**
+ * Every project-relative file a relative module specifier may name, in the
+ * order a resolver tries them: the specifier as written, then the TypeScript
+ * sources it rewrites to (a NodeNext project writes `./foo.js` and means
+ * `foo.ts`), then the JavaScript ones, then each folder index. Empty when the
+ * specifier is a package or points outside the project. A caller that can
+ * test existence takes the first candidate that exists; a caller that keys a
+ * site by its module keys it by every candidate, since without the file list
+ * `./foo.js` is `foo.ts` in one project and `foo.js` in the next.
+ */
+export function specifierCandidates(from: string, specifier: string): string[] {
+  if (!specifier.startsWith(".")) return [];
   const dir = dirname(from);
   const base = join(dir, specifier).split(sep).join("/");
-  if (base.startsWith("..")) return undefined;
-  const stripped = base.replace(/\.(js|mjs|cjs|ts|mts|cts|tsx)$/, "");
-  return [base, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}/index.ts`, `${base}/index.ts`].find(
-    (candidate) => SOURCE_EXTENSIONS.has(extensionOf(candidate)),
-  );
+  if (base.startsWith("..")) return [];
+  const stripped = base.replace(/\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/, "");
+  const candidates = [
+    base,
+    ...[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].map((extension) => `${stripped}${extension}`),
+    ...[".ts", ".tsx", ".js", ".jsx"].flatMap((extension) => [`${stripped}/index${extension}`, `${base}/index${extension}`]),
+  ];
+  return [...new Set(candidates.filter((candidate) => SOURCE_EXTENSIONS.has(extensionOf(candidate))))];
+}
+
+/**
+ * The file a relative module specifier names, project-relative: the first
+ * candidate that `exists`, or without an existence test the first candidate
+ * at all; undefined when it is a package, points outside, or no candidate
+ * exists.
+ */
+export function resolveSpecifier(from: string, specifier: string, exists?: (candidate: string) => boolean): string | undefined {
+  const candidates = specifierCandidates(from, specifier);
+  return exists === undefined ? candidates[0] : candidates.find(exists);
 }
 
 function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: string[]; symbol: DocumentSymbol }[] {
@@ -470,7 +511,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     // The server searches only the projects it has loaded: a name it does not know yet (a cold server, a second tsconfig) is
     // looked for in the files whose text spells it, and confirmed by their document symbols, never by the text alone.
     const spelled = new RegExp(`(^|[^\\w$])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
-    for (const file of this.walkedNow().filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel))) {
+    for (const file of projectSources(this.walkedNow())) {
       let text: string;
       try {
         text = readFileSync(join(this.root, file), "utf8");
@@ -586,6 +627,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   /** The sites where another module re-exports this file wholesale, scanned once per forget because the reference query never reports them. */
   private wildcardReExports(file: string): ReferenceSite[] {
     if (this.wildcards === undefined) {
+      const walked = new Set(this.walkedNow());
       const found = new Map<string, ReferenceSite[]>();
       for (const source of sourceFilesUnder(this.root)) {
         let lines: string[];
@@ -597,7 +639,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         for (let i = 0; i < lines.length; i++) {
           const match = WILDCARD_REEXPORT.exec(lines[i] ?? "");
           if (match === null) continue;
-          const target = resolveSpecifier(source, match[1]!);
+          const target = resolveSpecifier(source, match[1]!, (candidate) => walked.has(candidate));
           if (target === undefined) continue;
           const list = found.get(target) ?? [];
           list.push({ file: source, line: i + 1, character: (lines[i] ?? "").indexOf("*"), symbol: undefined, form: "re-export" });

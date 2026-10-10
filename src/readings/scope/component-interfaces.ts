@@ -83,7 +83,7 @@ import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, 
 import { configRecord } from "../../adapters/project-config.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
-import { resolveSpecifier } from "../../adapters/typescript.ts";
+import { specifierCandidates } from "../../adapters/typescript.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
@@ -331,10 +331,7 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
     if (language === "typescript") {
       for (const [, name] of text.matchAll(TS_DEFAULT_NAME)) defaults.add(name!);
       for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        const target = resolveSpecifier(file, specifier!);
-        if (target === undefined) continue;
-        const stripped = target.replace(/\.(ts|tsx|mts|cts)$/, "");
-        for (const candidate of [target, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}/index.ts`]) add(wildcards, candidate, owner);
+        for (const candidate of specifierCandidates(file, specifier!)) add(wildcards, candidate, owner);
       }
     } else {
       for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
