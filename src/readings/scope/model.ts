@@ -355,19 +355,10 @@ export interface RunsData {
 
 /* The journal, as src/journal records it. */
 
-export type JournalKind =
-  | "decision"
-  | "retraction"
-  | "conjecture"
-  | "resolution"
-  | "dismissal"
-  | "defect"
-  | "experiment"
-  | "close"
-  | "unable"
-  | "escalation"
-  | "acknowledgement"
-  | "enactment";
+import type { Kind } from "../../journal/kinds.ts";
+
+/** The journal's kinds, as its minter's table names them: a kind added there is one every Record<JournalKind, …> here must name. */
+export type JournalKind = Kind;
 
 export interface JournalHead {
   id: string;

@@ -8,24 +8,9 @@
  */
 
 import { createHash } from "node:crypto";
+import { KINDS, WORK_KINDS, type Kind, type WorkKind } from "./kinds.ts";
 
-/** Every kind the journal records, with the id prefix that marks it. */
-export const KINDS = {
-  decision: "d",
-  retraction: "rt",
-  conjecture: "c",
-  resolution: "rs",
-  dismissal: "dm",
-  defect: "df",
-  experiment: "x",
-  close: "xc",
-  unable: "u",
-  escalation: "e",
-  acknowledgement: "ak",
-  enactment: "en",
-} as const;
-
-export type Kind = keyof typeof KINDS;
+export { KINDS, WORK_KINDS, type Kind, type WorkKind };
 
 export const KIND_NAMES: readonly Kind[] = Object.keys(KINDS) as Kind[];
 
@@ -51,20 +36,6 @@ export const GLYPH: Record<Kind, string> = {
 
 /** The candidate every conjecture carries whether or not the caller named it. */
 export const INSTRUMENT_IS_WRONG = "the instrument is wrong";
-
-/**
- * The kinds the work store records, with their id prefixes. Work orders live
- * in their own files under .coherence/work; these kinds never appear in the
- * journal, but their ids come from the same minter.
- */
-export const WORK_KINDS = {
-  order: "w",
-  move: "wm",
-  owner: "wo",
-  completion: "wc",
-} as const;
-
-export type WorkKind = keyof typeof WORK_KINDS;
 
 export function isWorkKind(value: string): value is WorkKind {
   return Object.hasOwn(WORK_KINDS, value);
