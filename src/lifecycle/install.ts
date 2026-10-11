@@ -56,10 +56,12 @@ import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
-import { EARLIER_SEARCH, searchesCheckoutFirst } from "./version.ts";
+import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
+import { isOwnHook } from "./hook-command.ts";
+import { CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
 export { DURABLE_FOLDERS, HOME_VAR, SIBLING };
-export { EARLIER_SEARCH, earlierSearchLines, searchesCheckoutFirst } from "./version.ts";
+export { EARLIER_SEARCH, earlierHookLines, searchesCheckoutFirst } from "./version.ts";
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
@@ -91,10 +93,8 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
  * <Event>`. A stranger's cli.ts, or a program whose name merely contains
  * "coherence", is never ours and is never touched.
  */
-const MINE = new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
-
 function isMine(command: unknown): command is string {
-  return typeof command === "string" && MINE.test(command);
+  return typeof command === "string" && HOOK_EVENTS.some((event) => isOwnHook(command, event));
 }
 
 interface HookCommand {
@@ -258,8 +258,8 @@ function hooksOf(settings: Record<string, unknown>): HooksByEvent {
   return out;
 }
 
-/** The tools whose use can fire a practice: a command, or a file written. */
-export const PRACTICE_TOOLS = "Bash|Edit|Write|MultiEdit|NotebookEdit";
+/** The tools whose use can fire a practice, a command or a file written: every Claude Code tool that writes, as host-tools.ts declares them. */
+export const PRACTICE_TOOLS = CLAUDE_WRITER_MATCHER;
 
 /** The one entry install writes for an event: the merge writes it and the check compares against it. */
 export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: HookEvent): HookEntry {
@@ -431,7 +431,7 @@ export function formatUninstall(host: Host, result: UninstallResult): string {
 /** One way the installed hooks differ from what install would write. */
 export type Drift =
   | { event: string; kind: "missing"; expected: string }
-  | { event: string; kind: "stale"; expected: string; found: string; differences: string[] }
+  | { event: string; kind: "stale"; expected: string; found: string; differences: string[]; unmatched?: string[] }
   | { event: string; kind: "extra"; found: string; reason: string };
 
 export interface CheckResult {
@@ -456,8 +456,8 @@ function differences(found: HookEntry, expected: HookEntry): string[] {
   }
   if (ours.length > 1) out.push(`the entry holds ${ours.length} commands of ours; install writes one`);
   if (found.hooks.length > ours.length) out.push(`the entry is shared with ${found.hooks.length - ours.length} other hook${found.hooks.length - ours.length === 1 ? "" : "s"}; install writes an entry of its own`);
-  for (const key of Object.keys(found)) {
-    if (key !== "hooks") out.push(`entry field ${key}: installed ${show(found[key])}; install writes none`);
+  for (const key of new Set([...Object.keys(found), ...Object.keys(expected)])) {
+    if (key !== "hooks" && !isDeepStrictEqual(found[key], expected[key])) out.push(`entry field ${key}: installed ${show(found[key])}; install would write ${show(expected[key])}`);
   }
   return out;
 }
@@ -486,7 +486,11 @@ export function driftOf(settings: Record<string, unknown>, options: Pick<Install
     ours.forEach((entry, index) => {
       const found = entry.hooks.find((h) => isMine(h.command))!.command;
       if (index !== primary) drift.push({ event, kind: "extra", found, reason: "a second entry of ours for this event" });
-      else if (exact === -1) drift.push({ event, kind: "stale", expected: want, found, differences: differences(entry, expected) });
+      else if (exact === -1) {
+        // A matcher that leaves out a tool that writes is the drift that keeps a practice from arriving: named, so the check says why.
+        const unmatched = expected.matcher === undefined ? [] : writersUnmatched(entry.matcher);
+        drift.push({ event, kind: "stale", expected: want, found, differences: differences(entry, expected), ...(unmatched.length > 0 ? { unmatched } : {}) });
+      }
     });
   }
   for (const [event, entries] of Object.entries(hooks)) {
@@ -519,6 +523,8 @@ export function formatCheck(result: CheckResult): string {
     else lines.push(`  ${d.event}: extra Coherence entry (${d.reason}): ${d.found}`);
   }
   if (result.drift.some((d) => d.kind !== "missing" && searchesCheckoutFirst(d.found))) lines.push(`  these hooks were ${EARLIER_SEARCH}; reinstall them`);
+  const unmatched = result.drift.flatMap((d) => (d.kind === "stale" ? (d.unmatched ?? []) : []));
+  if (unmatched.length > 0) lines.push(`  ${earlierMatcher(unmatched)}; reinstall them`);
   lines.push(`converge with: hooks install --host ${result.host}`);
   return lines.join("\n") + "\n";
 }

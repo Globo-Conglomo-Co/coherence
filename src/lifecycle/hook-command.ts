@@ -8,6 +8,11 @@
 
 import { PACKAGE_NAME, SIBLING } from "./project.ts";
 
+/** Whether a command is Coherence's hook for `event`: this tool's binary or its own src/cli.ts, followed by hook <event>, as install's ownership test reads it. */
+export function isOwnHook(command: unknown, event: string): boolean {
+  return typeof command === "string" && new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+${event}\\s*$`).test(command);
+}
+
 /**
  * Whether a command of ours is the located command an earlier Coherence
  * wrote, which looked at a checkout beside the project before the installed
