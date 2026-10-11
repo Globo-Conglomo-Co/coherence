@@ -20,8 +20,9 @@ import { join } from "node:path";
 import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
 import { isWorkKind, TERMINAL_STATES, type WorkRecord, type WorkState } from "./record.ts";
+import { storeDir } from "./stores.ts";
 
-export const WORK_DIR = join(".coherence", "work");
+export const WORK_DIR = storeDir("work");
 
 /** A session names its file, so it must be a plain file-safe token. */
 export const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
