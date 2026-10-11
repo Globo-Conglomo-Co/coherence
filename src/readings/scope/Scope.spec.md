@@ -639,3 +639,15 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: project-source -> reading
   refuted: made languagesReadLine print its line for a project of one language read whole -> "a single-language project reads as it always did: one language read, no languages line printed" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- the page's bundle is what its entry imports: Scope's browser bundle is every module the page's entry imports at run time, followed to the end and joined dependencies first; no list names them, so a module a source calls into is always joined, and an import the browser cannot resolve inside the bundle (a package, a node: module, a renamed, namespace or default import) fails the build naming the importer.
+  over: an entry whose imports reach a module two levels down and one outside this folder, a bare import for its effect, an import list stripped empty, and a node: module, a package, a renamed, a namespace and a default import, each refused
+  via: the browser bundle is every module the entry imports at run time, dependencies first, and an import the browser cannot resolve fails the build
+  because: a hand list of browser sources left out languages-read.ts when structure-flow.ts began calling languagesReadLine (b37627e), so from 1.6.0 to 1.7.1 the live page threw a ReferenceError the tests never saw, since they run each module in Node where its imports resolve; deriving the bundle from the imports removes the list that drifted
+  refuted: let browserSources skip following imports, so the bundle held the entry alone -> "the browser bundle is every module the entry imports at run time, dependencies first, and an import the browser cannot resolve fails the build" went red in browser-bundle.test.ts; restored (cmp), green (2026-10-11)
+  kinds: none
+- a page that cannot draw says so: When the page's drawing throws, at the first load, on an update or in a snapshot, or anything in the page fails uncaught, the failure is shown at the top of the page with its message, replacing the waiting line; it is never kept as a connection reason nothing shows, and the page stops rather than retry a drawing that fails the same way.
+  over: the bundled page, run as the browser runs it, against a first load its drawing cannot draw
+  via: a page whose drawing throws shows the failure where the reader sees it, never a waiting line forever
+  because: the page caught the ReferenceError from drawing the first load as if the connection had dropped, stored it as a reason, and never drew again, so the reader saw the waiting line forever and the cause only in a debugger
+  refuted: let a drawing's error reach the connection loop again, as before -> "a page whose drawing throws shows the failure where the reader sees it, never a waiting line forever" went red in browser-bundle.test.ts; restored (cmp), green (2026-10-11)
+  kinds: none
