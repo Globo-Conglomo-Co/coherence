@@ -228,13 +228,13 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   execFileSync("git", ["tag", "v0.2.0"], { cwd: root });
   witness(root, "widget", "knob turns", "2026-10-02T12:00:00.000Z");
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "silent-skip", "--introduced", feature.slice(0, 9), "--caught", "review", ...WHO));
+  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "cost", "--introduced", feature.slice(0, 9), "--caught", "review", ...WHO));
   const byPull = idOf(j("defect", "the dial stuck", "--evidence", "e", "--introduced", "PR #7", "--caught", "test", ...WHO));
   idOf(j("defect", "the knob was always loose", "--evidence", "e", "--introduced", "pre-existing", "--caught", "adopter", ...WHO));
   const bare = idOf(j("defect", "something rattled", "--evidence", "e", ...WHO));
   idOf(j("resolved", byCommit, "--because", "fixed, every dial checked", "--guard", "widget/knob turns", ...WHO));
   idOf(j("resolved", bare, "--because", "tightened", ...WHO));
-  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "silent-skip", ...WHO));
+  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "cost", ...WHO));
   mkdirSync(join(root, ".coherence", "hook-times"), { recursive: true });
   writeFileSync(
     join(root, ".coherence", "hook-times", "s.jsonl"),
@@ -257,7 +257,7 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   assert.deepEqual(release.bullets && [release.bullets.bullets, release.bullets.enforced], [2, 2]);
   assert.deepEqual(c.releases.find((r) => r.tag === "v0.1.0")!.bullets!.bullets, 1);
   assert.deepEqual([c.closing.closed, c.closing.guarded, c.closing.neither], [2, 1, 1]);
-  assert.deepEqual(c.repeats, [{ class: "silent-skip", allTime: 1, inWindow: 1 }]);
+  assert.deepEqual(c.repeats, [{ class: "cost", allTime: 1, inWindow: 1 }]);
   assert.ok(c.repeats.length === 1 && repeat.startsWith("df-"));
   assert.deepEqual(
     c.hookLatency.map((h) => [h.event, h.version, h.count, h.p50, h.p95]),

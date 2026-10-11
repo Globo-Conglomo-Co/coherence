@@ -35,6 +35,7 @@ import { digest, lexiconReading, singularForms, type Contribution, type Coverage
 import type { Lexicon } from "./lexicon.ts";
 import { vocabularyFacts } from "./project.ts";
 import { journalFileKeys } from "../journal/store.ts";
+import { storeDir } from "../journal/stores.ts";
 
 const SHAPE = "vocabulary-1";
 /** Buckets per kind: an edit reads at most this many term buckets, whatever the project's size. */
@@ -339,7 +340,7 @@ function readMeta(root: string): Meta | undefined {
 function recordKeys(root: string): Record<string, string> | undefined {
   try {
     const out = Object.fromEntries([...journalFileKeys(root)].map(([name, key]) => [`journal/${name}`, key]));
-    const dir = join(root, ".coherence", "work");
+    const dir = join(root, storeDir("work"));
     let names: string[];
     try {
       names = readdirSync(dir);

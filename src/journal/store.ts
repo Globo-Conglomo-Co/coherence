@@ -14,9 +14,10 @@ import { join } from "node:path";
 import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
+import { storeDir } from "./stores.ts";
 import { SESSION_TOKEN, workBinding } from "./work.ts";
 
-export const JOURNAL_DIR = join(".coherence", "journal");
+export const JOURNAL_DIR = storeDir("journal");
 
 export function journalDir(cwd: string): string {
   return join(cwd, JOURNAL_DIR);

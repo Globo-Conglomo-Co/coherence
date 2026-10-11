@@ -40,6 +40,7 @@ import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
+import { recordWords } from "../journal/record.ts";
 import { countWork } from "./work-meter.ts";
 import {
   corpusFiles,
@@ -342,9 +343,12 @@ function wordRuns(text: string): Word[][] {
   return runs;
 }
 
-/** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
-const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
-
+/**
+ * The written prose of a journal or work record line: every field its role
+ * table (journal/record.ts) calls prose, and a decision's over, whose refused
+ * name is still a use of the words; ids, sessions, commits, paths and states
+ * are not words. A line that will not parse is read whole.
+ */
 export function recordProse(line: string): string[] {
   let value: unknown;
   try {
@@ -352,15 +356,7 @@ export function recordProse(line: string): string[] {
   } catch {
     return [line];
   }
-  const out: string[] = [];
-  const walk = (v: unknown, key: string | undefined): void => {
-    if (key !== undefined && RECORD_METADATA.has(key)) return;
-    if (typeof v === "string") out.push(v);
-    else if (Array.isArray(v)) for (const item of v) walk(item, undefined);
-    else if (v !== null && typeof v === "object") for (const [k, item] of Object.entries(v)) walk(item, k);
-  };
-  walk(value, undefined);
-  return out;
+  return recordWords(value, (role) => role !== "meta");
 }
 
 interface Pool {
