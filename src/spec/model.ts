@@ -33,6 +33,26 @@ import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPr
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
 
+/**
+ * The project files the spec model finds by their names, each kind by the
+ * suffix that marks it. The model's walk selects its specs and practice files
+ * through modelFileKind, and so does every watcher that refreshes what the
+ * model drew, so a kind of file the model begins to read is watched with it.
+ */
+export const MODEL_FILES = { spec: SPEC_SUFFIX, practice: PRACTICE_SUFFIX } as const;
+
+export type ModelFileKind = keyof typeof MODEL_FILES;
+
+/** Which of the model's files a path is, by its name, or undefined when the model's walk never reads it. */
+export function modelFileKind(rel: string): ModelFileKind | undefined {
+  return (Object.keys(MODEL_FILES) as ModelFileKind[]).find((kind) => rel.endsWith(MODEL_FILES[kind]));
+}
+
+/** Whether the spec model reads this project path: one of its files by name, or the config. */
+export function readByModel(rel: string): boolean {
+  return modelFileKind(rel) !== undefined || rel === CONFIG_FILE;
+}
+
 export interface ModelInvariant extends Invariant {
   /** The folder of the component the bullet lives in. */
   component: string;
@@ -327,7 +347,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.push(...ignoreProblems(root, walked));
   const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
-  for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
+  for (const specPath of walked.files.filter((rel) => modelFileKind(rel) === "spec").map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
     const rel = relative(root, specPath).split(sep).join("/");
     const existing = byFolder.get(folder);
@@ -342,7 +362,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
   const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
-  for (const rel of walked.files.filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+  for (const rel of walked.files.filter((f) => modelFileKind(f) === "practice").sort()) {
     const folder = folderOf(root, join(root, rel));
     const spec = byFolder.get(folder);
     if (spec === undefined) {

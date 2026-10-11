@@ -67,8 +67,13 @@ function dataFiles(): string[] {
   return [...codeFiles(CODE_DIR, []).filter((f) => f.endsWith(".json")), ...fromDocs, ...(existsSync(PACKAGE_JSON) ? [PACKAGE_JSON] : [])].sort();
 }
 
-/** The modules `entries` import, transitively, by relative specifier: the code a parse they make depends on. */
-function closureOf(entries: readonly string[]): string[] {
+/**
+ * The modules `entries` import, transitively, by relative specifier: the code
+ * a parse they make depends on. Entries are named as in src; this
+ * installation's own files are what is followed, the sources in a checkout
+ * and the compiled modules beside each other in the published package.
+ */
+export function closureOf(entries: readonly string[]): string[] {
   const seen = new Set<string>();
   const visit = (file: string): void => {
     if (seen.has(file)) return;

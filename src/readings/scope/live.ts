@@ -15,8 +15,9 @@
  * The state is loaded once through scopeState, whole, and kept current: the
  * journal, runs and work folders are watched, and an append is read back
  * from its store and sent as the records that are new (by id, or a run's time
- * and session); a spec, a lexicon or the config changing reloads the state
- * and sends it as a snapshot with a new version. The component interfaces
+ * and session); a spec, a practice file, a lexicon or the config changing
+ * (whatever the spec model reads by name) reloads the state and sends it as
+ * a snapshot with a new version. The component interfaces
  * are read through the server's own instrument (or, for a Python adoption
  * the config bounds, a bounded server the reading keeps for itself) when the
  * reading is first asked for and again when a run lands, never on every file
@@ -42,6 +43,8 @@ import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./co
 import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import { isLanguage } from "../../adapters/index.ts";
+import { readByModel } from "../../spec/model.ts";
+import { DEFAULT_PROJECT_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
 import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { runKeyOf } from "./updates.ts";
@@ -100,8 +103,27 @@ export function storeOf(path: string, lexicons: readonly string[]): Store | unde
   if (name.startsWith(".coherence/runs/")) return "runs";
   if (name.startsWith(".coherence/work/")) return "work";
   if (name.startsWith(".git/") || name.startsWith(".coherence/") || name.startsWith("node_modules/") || name.includes("/node_modules/")) return undefined;
-  if (name.endsWith(".spec.md") || name === "coherence.config.json" || lexicons.includes(name)) return "model";
+  // The spec model's own test of what it reads, so a kind of file it begins to read refreshes the reading with it.
+  if (readByModel(name) || lexicons.includes(name)) return "model";
   return undefined;
+}
+
+/**
+ * The lexicons a reading of `root` loads, as paths inside it: Coherence's own
+ * when it lies there, the domain lexicon given or located as the state's load
+ * locates it (the config's lexicon key, else the default name), and the
+ * default name, so one written later is noticed. A config that will not parse
+ * locates nothing here; the config itself is watched, and its reload says why.
+ */
+export async function watchedLexicons(root: string, build: Pick<BuildOptions, "lexiconPath" | "domainPath">): Promise<string[]> {
+  let located: string | undefined;
+  try {
+    located = build.domainPath ?? (await projectLexiconPath(root));
+  } catch {
+    located = undefined;
+  }
+  const inside = [build.lexiconPath, located, DEFAULT_PROJECT_LEXICON].filter((p): p is string => p !== undefined).map((p) => relative(root, resolve(root, p)).split(sep).join("/"));
+  return [...new Set(inside.filter((p) => !p.startsWith("..")))];
 }
 
 class LiveReading implements HttpApp {
@@ -124,6 +146,8 @@ class LiveReading implements HttpApp {
   private readingServer: { adapter: LanguageAdapter; bounds: string } | undefined;
   private readonly clients = new Set<ServerResponse>();
   private readonly watchers: FSWatcher[] = [];
+  /** The lexicons the state loaded, located again with every reload, so a config that names another is followed. */
+  private lexicons: string[] = [];
   private readonly timers = new Map<Store, NodeJS.Timeout>();
   private chain: Promise<void> = Promise.resolve();
   private closed = false;
@@ -149,6 +173,7 @@ class LiveReading implements HttpApp {
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
       this.base = state;
       this.remember(state);
+      this.lexicons = await watchedLexicons(this.root, this.build);
       this.watch();
       this.readInterfaces();
       return state;
@@ -162,17 +187,11 @@ class LiveReading implements HttpApp {
     this.workIds = new Set(state.journal.work.kind === "present" ? state.journal.work.orders.flatMap((order) => [order.id, ...order.history.map((h) => h.id)]) : []);
   }
 
-  private lexiconPaths(): string[] {
-    const inside = [this.build.lexiconPath, this.build.domainPath].filter((p): p is string => p !== undefined).map((p) => relative(this.root, resolve(this.root, p)));
-    return [...inside.filter((p) => !p.startsWith("..")), "lexicon.json", "docs/lexicon.json"];
-  }
-
   private watch(): void {
-    const lexicons = this.lexiconPaths();
     try {
       const watcher = watch(this.root, { recursive: true }, (_event, name) => {
         if (name === null) return;
-        const store = storeOf(String(name), lexicons);
+        const store = storeOf(String(name), this.lexicons);
         if (store !== undefined) this.changed(store);
       });
       watcher.on("error", (error) => this.context.log(`scope: the watch on ${this.root} failed: ${error.message}`));
@@ -241,6 +260,7 @@ class LiveReading implements HttpApp {
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
       this.base = state;
       this.remember(state);
+      this.lexicons = await watchedLexicons(this.root, this.build);
       this.version += 1;
       this.send("snapshot", { state: windowState(state), version: this.versionId });
     }

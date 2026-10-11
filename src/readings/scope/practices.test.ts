@@ -6,9 +6,10 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { KINDS, WORK_KINDS, recordId, type Kind, type WorkKind } from "../../journal/record.ts";
 import { windowJournal } from "./derive.ts";
 import type { JournalRecord, ScopePractice, ShellState } from "./model.ts";
-import { adherence, practiceStoryText } from "./practices.ts";
+import { adherence, citationKind, practiceOrigin, practiceStoryText } from "./practices.ts";
 import { renderPracticesResults } from "./practices-view.ts";
 
 const head = (id: string, at: string) => ({ id, at, session: "s1", agent: "main", commit: null, dirty: false });
@@ -106,4 +107,16 @@ test("the journal window keeps every enactment, every decision that cites one, a
   assert.ok(ids.has("d-0000dddd"), "the decision that cites an enactment: an amendment");
   assert.ok(ids.has("df-0000aaaa"), "a record a practice cites");
   assert.ok(!ids.has("d-0000eeee"), "an old record nothing needs stays out");
+});
+
+test("a citation's kind is read off the minter's tables: an id of every journal and work kind names its kind, and a practice's evidence counts each", () => {
+  const minted = [
+    ...(Object.keys(KINDS) as Kind[]).map((kind) => ({ id: recordId(kind, "s1", "2026-10-11T00:00:00.000Z", kind), named: kind as string })),
+    ...(Object.keys(WORK_KINDS) as WorkKind[]).map((kind) => ({ id: recordId(kind, "s1", "2026-10-11T00:00:00.000Z", kind), named: `work ${kind}` })),
+  ];
+  for (const { id, named } of minted) assert.equal(citationKind(id), named, id);
+  assert.equal(citationKind("e76cbca"), "commit");
+  const origin = practiceOrigin(practice({ pitfalls: [], learned: minted.map((m) => m.id) }), []);
+  assert.doesNotMatch(origin.learnedFrom, /\brecord/, origin.learnedFrom);
+  assert.match(origin.learnedFrom, /1 work move/);
 });
