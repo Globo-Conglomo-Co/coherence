@@ -30,9 +30,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node
 import { availableParallelism, loadavg } from "node:os";
 import { basename, join } from "node:path";
 import { appendWhole, storeLines } from "../journal/append.ts";
+import { storeDir } from "../journal/stores.ts";
 import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
 
-export const RUNS_DIR = join(".coherence", "runs");
+export const RUNS_DIR = storeDir("runs");
 
 export type Form = "chokepoint" | "totality oracle";
 export type Verdict = "pass" | "fail" | "not run";
