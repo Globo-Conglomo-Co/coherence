@@ -192,6 +192,19 @@ class Instruments {
   }
 }
 
+/**
+ * A run asked for invariants that no bullet names. Nothing runs: a run that
+ * left them out would report the others' verdicts and exit as if every one
+ * asked for had passed, so a misspelled name would look checked.
+ */
+export class UnknownInvariants extends Error {
+  readonly names: readonly string[];
+  constructor(names: readonly string[]) {
+    super(`run: no bullet is named ${names.map((n) => `"${n}"`).join(", ")}; give a bullet's name, or <component folder>/<bullet name> as refute takes it`);
+    this.names = names;
+  }
+}
+
 /** One chokepoint enforcement of a selected invariant, with the languages it may be written in, the likeliest first. */
 interface ChokepointPlan {
   component: string;
@@ -286,9 +299,13 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const wantTotality = options.form === undefined || options.form === "totality oracle";
   const chosen = new Set(options.invariants ?? []);
   const multi = config.languages.length > 1;
+  // A name is a bullet's own, or its component folder and name as refute takes it; each must name a bullet, or nothing runs.
+  const isChosen = (folder: string, name: string): boolean => chosen.has(name) || chosen.has(`${folder}/${name}`);
+  const unmatched = [...chosen].filter((wanted) => !model.components.some((c) => c.invariants.some((i) => wanted === i.name || wanted === `${c.folder}/${i.name}`)));
+  if (unmatched.length > 0) throw new UnknownInvariants(unmatched);
 
   const selected = model.components.flatMap((c) =>
-    c.invariants.filter((i) => (chosen.size === 0 || chosen.has(i.name)) && i.enforcements.length > 0).map((i) => ({ component: c.folder, invariant: i })),
+    c.invariants.filter((i) => (chosen.size === 0 || isChosen(c.folder, i.name)) && i.enforcements.length > 0).map((i) => ({ component: c.folder, invariant: i })),
   );
 
   const details: EntryDetail[] = [];

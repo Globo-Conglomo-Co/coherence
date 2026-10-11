@@ -26,7 +26,7 @@ import { governedBy } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { latencyLines } from "./latency.ts";
 import { RUNS_DIR, appendRefutation, latestByEnforcement, loadRuns, type Form, type RefutationRecord } from "./record.ts";
-import { performRun, type EachOutcome, type EntryDetail, type RunOutcome } from "./run.ts";
+import { performRun, UnknownInvariants, type EachOutcome, type EntryDetail, type RunOutcome } from "./run.ts";
 import { DEFAULT_IDLE_MS, serve, type ServeOptions } from "./server.ts";
 import { gitState } from "../journal/store.ts";
 import { formatObservationSummary } from "../observation/observed.ts";
@@ -238,7 +238,14 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
       io.err("run: --each confirms totality oracles one at a time; --form chokepoint runs none");
       return 64;
     }
-    const outcome = await performRun(root, { session, agent, form, invariants, adapter: direct, adapters, server: directs.length === 0, observe, each });
+    let outcome: Awaited<ReturnType<typeof performRun>>;
+    try {
+      outcome = await performRun(root, { session, agent, form, invariants, adapter: direct, adapters, server: directs.length === 0, observe, each });
+    } catch (error) {
+      if (!(error instanceof UnknownInvariants)) throw error;
+      io.err(error.message);
+      return 64;
+    }
     if (parsed.switches.has("json")) {
       io.out(
         JSON.stringify(
