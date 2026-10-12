@@ -37,8 +37,17 @@ function toolSources(dir: string, into: string[] = []): string[] {
   return into;
 }
 
-/** The string-literal unions and `as const` string lists a text writes, each as its sorted members. */
-function literalSets(text: string): string[][] {
+/**
+ * The string-literal unions and `as const` string lists a text writes, each
+ * as its sorted members. Comments are left out, and so is a union passed to
+ * Omit, Pick, Exclude or Extract, which names members of another type: a
+ * selection, not a list.
+ */
+function literalSets(source: string): string[][] {
+  const text = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1")
+    .replace(/\b(?:Omit|Pick|Exclude|Extract)<[^<>]*?,\s*"[^"\n]+"(?:\s*\|\s*"[^"\n]+")*\s*>/g, "");
   const unions = [...text.matchAll(/"[^"\n]+"(?:\s*\|\s*"[^"\n]+")+/g)].map((m) => [...m[0].matchAll(/"([^"]+)"/g)].map((x) => x[1]!));
   const lists = [...text.matchAll(/\[\s*("[^"\n]+"(?:\s*,\s*"[^"\n]+")+)\s*\]\s*as const/g)].map((m) => [...m[1]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!));
   return [...unions, ...lists].map((s) => [...new Set(s)].sort()).filter((s) => s.length >= 2);
