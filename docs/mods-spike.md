@@ -1,6 +1,6 @@
 # Spike: Coherence as a Claude Code mod with a warm hook process
 
-Status: spike (branch `mods-spike`), measured 2026-10-09 on Claude Code 2.1.295 and Coherence 1.7.0 plus this branch.
+Status: shipped as an opt-in fast path (`hooks install --host claude --mod`, see the README) on 2026-10-12; measured 2026-10-09 on Claude Code 2.1.295 and Coherence 1.7.0 plus the spike branch.
 
 ## What was built
 
@@ -103,8 +103,8 @@ Ship it as an opt-in fast path for Claude Code (d-ee82802b). Codex keeps the set
 - **The gain is real.** The mod saves about 0.25 s of process start on every Coherence event, and about 1.1 to 1.5 s per short PostHog session. In the e2e runs that is what moved the leaf-entry hook from over the 3 s budget to under it.
 - **The gain is bounded.** The expensive cases are work, not start-up: the first leaf entry (3 s) and the stop after an edit (19.5 s, c-ccb3a873). Those need their own fixes, and the warm process does not provide them.
 - **Before a default:**
-  1. `hooks install --host claude --mod` should install the mod and leave Claude's settings hooks out, because the mod stands aside while they are wired.
-  2. Ship `mods/` in the package and resolve the CLI from it.
+  1. Done: `hooks install --host claude --mod` installs the mod at the personal scope and removes the personal settings hooks; the committed ones stay and are named.
+  2. Done differently: the repository is the mod's marketplace and the mod runs each project's own installed Coherence. A marketplace in the package's folder could not work, because Claude Code knows a marketplace by name machine-wide: a second project registering its own folder repointed the first project's mod, and removing it uninstalled the mod everywhere.
   3. Resolve c-5bebbd18 (caches in a long process) and c-114af1cb (serialised events).
   4. Watch the TUI on a real terminal and Desktop.
 
