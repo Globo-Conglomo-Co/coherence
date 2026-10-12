@@ -88,7 +88,7 @@ ${SCOPE_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hook-serve [--socket]   the warm hook process: {"op":"hook","event":...,"input":...} per line on stdin; --socket also over HTTP on a Unix socket
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
-  coherence hooks install --host claude --mod   Claude Code only, for you on this machine: Coherence's mod answers every event through one warm process per session, in place of your personal settings hooks
+  coherence hooks install --host claude --mod [--shared]   Claude Code only: Coherence's mod answers every event through one warm process per session, in place of your personal settings hooks; --shared: for the whole team, in the committed settings, in place of the committed hooks
   coherence hooks uninstall --host <${HOSTS.join("|")}>   removes the mod too
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
@@ -241,7 +241,7 @@ async function hookServeCommand(args: string[], root: string): Promise<number> {
 
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
-  install: new Set(["host", "command", "local", "mod"]),
+  install: new Set(["host", "command", "local", "mod", "shared"]),
   uninstall: new Set(["host"]),
   check: new Set(["check", "host", "command", "local"]),
   status: new Set(),
@@ -280,7 +280,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
       ...(await Promise.all(shared.map((place) => Promise.all(HOSTS.map((host) => status(place.dir, host)))))).flat(),
       ...(await Promise.all(personal.map((place) => Promise.all(HOSTS.filter((host) => settingsFile(host, true) !== undefined).map((host) => status(place.dir, host, true)))))).flat(),
     ];
-    const modLines = personal.filter((place) => modInstalled(place.dir)).map(() => `claude: ${MOD_ID} enabled in the personal settings\n`).join("");
+    const modLines = [...shared.filter((place) => modInstalled(place.dir, "project")).map(() => `claude: ${MOD_ID} enabled in the committed settings\n`), ...personal.filter((place) => modInstalled(place.dir)).map(() => `claude: ${MOD_ID} enabled in the personal settings\n`)].join("");
     process.stdout.write(formatStatus(statuses) + modLines + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
@@ -292,7 +292,10 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
   if (verb === "uninstall") {
     // The mod first: while it is installed, the files .coherence keeps for git stay, since a host still runs Coherence.
-    if (host === "claude") for (const place of personal) if (modInstalled(place.dir)) process.stdout.write(modSteps(uninstallMod(place.dir)));
+    if (host === "claude") {
+      for (const place of shared) if (modInstalled(place.dir, "project")) process.stdout.write(modSteps(uninstallMod(place.dir, undefined, "project")));
+      for (const place of personal) if (modInstalled(place.dir)) process.stdout.write(modSteps(uninstallMod(place.dir)));
+    }
     // Ours leave both the shared and the personal settings, wherever install put them.
     for (const place of shared) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
     if (settingsFile(host, true) !== undefined) {
@@ -307,9 +310,9 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
-      if (local && host === "claude" && modInstalled(place.dir)) {
-        // The mod answers every event in place of the personal settings hooks.
-        process.stdout.write(`claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n`);
+      if (host === "claude" && modInstalled(place.dir, local ? "local" : "project")) {
+        // The mod answers every event in place of the settings hooks at this scope.
+        process.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
         continue;
       }
       let result;
@@ -324,7 +327,8 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
     }
     return drifted ? 1 : 0;
   }
-  if (flags.get("mod") === true) return modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
+  if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
+  if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(root, host, shared, given !== undefined || local) : modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);
     const registry = registryOf(root);
@@ -369,6 +373,37 @@ async function modInstallCommand(root: string, host: string, personal: SettingsR
     if (held.length > 0) process.stdout.write(`claude: ${resolve(place.dir, settingsFile("claude")!)} still runs Coherence for ${[...new Set(held.map((h) => h.event))].join(", ")}; the mod answers none of those events while it does. Those hooks are committed and the team's: \`hooks uninstall --host claude\` removes them for everyone.\n`);
   }
   process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence; it loads in Claude Code sessions started here from now on, and /reload-plugins loads it into one already running.\n`);
+  return 0;
+}
+
+/**
+ * hooks install --host claude --mod --shared: the mod for the whole team.
+ * Coherence's marketplace and its mod in the committed settings, then the
+ * committed Claude Code hooks of Coherence's out, which the mod replaces for
+ * everyone; another host's hooks stay. A personal hook of Coherence's would
+ * hold the mod back for its owner, so each is named.
+ */
+async function sharedModInstallCommand(root: string, host: string, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
+  if (host !== "claude") fail(`hooks install --mod --shared: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
+  if (flagged) fail(`hooks install --mod --shared: the mod finds Coherence itself; --local and --command do not apply\n${USAGE}`);
+  for (const place of shared) {
+    const steps = installMod(place.dir, undefined, "project");
+    process.stdout.write(modSteps(steps));
+    if (!steps.every((s) => s.ok) || steps.length < 2) {
+      process.stderr.write(`hooks install --mod --shared: Claude Code did not install the mod in ${place.dir}; the committed hooks are unchanged\n`);
+      return 1;
+    }
+    const removed = await uninstall(place.dir, "claude");
+    if (removed.removed.length > 0) process.stdout.write(formatUninstall("claude", removed));
+    const personalHeld = (await status(place.dir, "claude", true)).installed;
+    if (personalHeld.length > 0) process.stdout.write(`claude: your personal settings still run Coherence for ${[...new Set(personalHeld.map((h) => h.event))].join(", ")}; the mod answers none of those events for you while they do: \`hooks uninstall --host claude\` removes them.\n`);
+  }
+  const registry = registryOf(root);
+  for (const dir of registry === undefined ? [root] : registry.leaves) {
+    keepIgnore(dir, true);
+    keepAttributes(dir);
+  }
+  process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence. Commit ${settingsFile("claude")}: Claude Code asks each teammate to install the marketplace and the mod when they next start a session here.\n`);
   return 0;
 }
 

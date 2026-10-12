@@ -28,7 +28,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "./work-meter.ts";
-import { LOCAL_SETTINGS_FILE } from "./project.ts";
+import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./project.ts";
 
 export const MOD_NAME = "coherence";
 export const MOD_MARKETPLACE = "coherence";
@@ -59,10 +59,22 @@ export function localSettingsPath(root: string): string {
   return join(basename(dir) === ".git" ? dirname(dir) : root, LOCAL_SETTINGS_FILE.claude!);
 }
 
-/** Whether the personal settings Claude Code reads for this folder enable the mod. */
-export function modInstalled(root: string): boolean {
+/**
+ * Where the mod is enabled: `local` is one person's (Claude Code's local
+ * scope), `project` the team's, in the committed settings, which Claude Code
+ * keeps in the folder itself, a worktree's own included.
+ */
+export type ModScope = "local" | "project";
+
+/** The settings file a scope keeps the mod's enabling and its marketplace's declaration in. */
+export function modSettingsPath(root: string, scope: ModScope): string {
+  return scope === "local" ? localSettingsPath(root) : join(root, SETTINGS_FILE.claude);
+}
+
+/** Whether the settings Claude Code reads for this folder at this scope enable the mod. */
+export function modInstalled(root: string, scope: ModScope = "local"): boolean {
   try {
-    const settings = JSON.parse(readFileSync(localSettingsPath(root), "utf8")) as { enabledPlugins?: Record<string, unknown> };
+    const settings = JSON.parse(readFileSync(modSettingsPath(root, scope), "utf8")) as { enabledPlugins?: Record<string, unknown> };
     return settings.enabledPlugins?.[MOD_ID] === true;
   } catch {
     return false;
@@ -92,10 +104,10 @@ function step(run: ClaudeRunner, root: string, args: string[]): ModStep {
   return { args, ok: out.status === 0, said: out.status === null ? `claude could not be run (${out.stderr || "not on the PATH"})` : said(out) };
 }
 
-/** Register Coherence's repository as a marketplace and install the mod, both at the personal scope; stops at the first step that fails. */
-export function installMod(root: string, run: ClaudeRunner = runClaude): ModStep[] {
-  const steps = [step(run, root, ["plugin", "marketplace", "add", MOD_REPOSITORY, "--scope", "local", "--json"])];
-  if (steps[0]!.ok) steps.push(step(run, root, ["plugin", "install", MOD_ID, "--scope", "local", "--json"]));
+/** Register Coherence's repository as a marketplace and install the mod, both at one scope; stops at the first step that fails. */
+export function installMod(root: string, run: ClaudeRunner = runClaude, scope: ModScope = "local"): ModStep[] {
+  const steps = [step(run, root, ["plugin", "marketplace", "add", MOD_REPOSITORY, "--scope", scope, "--json"])];
+  if (steps[0]!.ok) steps.push(step(run, root, ["plugin", "install", MOD_ID, "--scope", scope, "--json"]));
   return steps;
 }
 
@@ -105,15 +117,14 @@ export function installMod(root: string, run: ClaudeRunner = runClaude): ModStep
  * marketplace remove` would uninstall the mod from every project on the
  * machine, since Claude Code knows the marketplace machine-wide.
  */
-export function uninstallMod(root: string, run: ClaudeRunner = runClaude): ModStep[] {
-  const steps = [step(run, root, ["plugin", "uninstall", MOD_ID, "--scope", "local", "--json"])];
-  if (steps[0]!.ok && dropDeclaration(root)) steps.push({ args: ["marketplace declaration", MOD_MARKETPLACE], ok: true, said: `removed from ${localSettingsPath(root)}; other projects keep the marketplace` });
+export function uninstallMod(root: string, run: ClaudeRunner = runClaude, scope: ModScope = "local"): ModStep[] {
+  const steps = [step(run, root, ["plugin", "uninstall", MOD_ID, "--scope", scope, "--json"])];
+  if (steps[0]!.ok && dropDeclaration(modSettingsPath(root, scope))) steps.push({ args: ["marketplace declaration", MOD_MARKETPLACE], ok: true, said: `removed from ${modSettingsPath(root, scope)}; other projects keep the marketplace` });
   return steps;
 }
 
-/** Remove the personal settings' declaration of Coherence's marketplace, only when it names Coherence's repository; keeps the file's indentation. */
-function dropDeclaration(root: string): boolean {
-  const path = localSettingsPath(root);
+/** Remove a settings file's declaration of Coherence's marketplace, only when it names Coherence's repository; keeps the file's indentation. */
+function dropDeclaration(path: string): boolean {
   let text: string;
   let settings: { extraKnownMarketplaces?: Record<string, { source?: { source?: unknown; repo?: unknown } }> };
   try {

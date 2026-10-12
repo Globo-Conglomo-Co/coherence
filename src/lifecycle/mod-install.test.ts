@@ -49,7 +49,7 @@ const FAKE_CLAUDE = `#!/usr/bin/env node
 const fs = require("fs");
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.FAKE_CLAUDE_LOG, args.join(" ") + "\\n");
-const file = ".claude/settings.local.json";
+const file = args.includes("project") ? ".claude/settings.json" : ".claude/settings.local.json";
 let s = {};
 try { s = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
 const verb = args.slice(0, args[1] === "marketplace" ? 3 : 2).join(" ");
@@ -121,6 +121,45 @@ test("while the mod is the only thing running Coherence, removing the last setti
     const result = await uninstall(project, "claude");
     assert.equal(result.removedIgnore, false);
     assert.ok(existsSync(join(project, IGNORE_FILE)));
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("hooks install --mod --shared enables the mod in the committed settings in place of the committed Claude Code hooks, keeps the other host's, and uninstall takes it out", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-mod-shared-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: project }).status, 0);
+    const bin = join(project, "bin");
+    await mkdir(bin);
+    await writeFile(join(bin, "claude"), FAKE_CLAUDE);
+    await chmod(join(bin, "claude"), 0o755);
+    const log = join(project, "claude.log");
+    const env = { ...process.env, PATH: `${bin}:${process.env["PATH"]}`, FAKE_CLAUDE_LOG: log };
+    const hooks = (...args: string[]) => spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", ...args], { cwd: project, encoding: "utf8", env });
+
+    assert.equal(hooks("install", "--host", "claude").status, 0);
+    assert.equal(hooks("install", "--host", "codex").status, 0);
+    assert.equal(hooks("install", "--host", "claude", "--shared").status, 64, "--shared belongs to --mod");
+    const installed = hooks("install", "--host", "claude", "--mod", "--shared");
+    assert.equal(installed.status, 0, installed.stderr);
+    assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), [`plugin marketplace add ${MOD_REPOSITORY} --scope project --json`, `plugin install ${MOD_ID} --scope project --json`]);
+    const committed = JSON.parse(await readFile(join(project, ".claude", "settings.json"), "utf8")) as Record<string, unknown>;
+    assert.equal(committed["hooks"], undefined, "the committed Claude Code hooks leave: the mod would stand aside for each");
+    assert.equal(modInstalled(project, "project"), true);
+    assert.ok(existsSync(join(project, ".codex", "hooks.json")) && readFileSync(join(project, ".codex", "hooks.json"), "utf8").includes("hook Stop"), "Codex keeps its hooks");
+    assert.ok(existsSync(join(project, IGNORE_FILE)), ".coherence's own files stay");
+    const check = hooks("--check", "--host", "claude");
+    assert.equal(check.status, 0, check.stdout);
+    assert.match(check.stdout, new RegExp(`${MOD_ID} is enabled in the committed settings and answers every event`));
+    assert.match(hooks("status").stdout, new RegExp(`${MOD_ID} enabled in the committed settings`));
+
+    await writeFile(log, "");
+    assert.equal(hooks("uninstall", "--host", "claude").status, 0);
+    assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), [`plugin uninstall ${MOD_ID} --scope project --json`]);
+    assert.equal(modInstalled(project, "project"), false);
+    const after = JSON.parse(await readFile(join(project, ".claude", "settings.json"), "utf8")) as { extraKnownMarketplaces?: Record<string, unknown> };
+    assert.deepEqual(Object.keys(after.extraKnownMarketplaces ?? {}), ["other"], "only the declaration install wrote leaves");
   } finally {
     await rm(project, { recursive: true, force: true });
   }
