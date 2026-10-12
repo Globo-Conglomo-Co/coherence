@@ -200,19 +200,24 @@ async function forward($: Engine, event: CoherenceEvent, input: Record<string, u
   return answer
 }
 
-/** What only the user reads: a stop's digest waits for the turn's end, anything else is a transcript line now. */
+/** A message as transcript lines: `$.ui.log` appends exactly one line, and draws a newline inside one as a stray glyph. */
+function logLines($: Engine, text: string): void {
+  for (const line of text.split('\n')) if (line.trim() !== '') $.ui.log(line)
+}
+
+/** What only the user reads: a stop's digest waits for the turn's end, anything else is transcript lines now. */
 function tell($: Engine, event: CoherenceEvent, user: string | undefined, debug: string | undefined): void {
   if (debug !== undefined && debug !== '') $.ui.log(`Coherence ${event}: ${debug}`, { to: 'debug' })
   if (user === undefined) return
   if (event !== 'Stop') {
-    $.ui.log(user)
+    logLines($, user)
     return
   }
   held.digest = user
   $.clock.after(DIGEST_WAIT_MS, () => {
     if (held.digest === user) {
       held.digest = undefined
-      $.ui.log(user)
+      logLines($, user)
     }
   })
 }
