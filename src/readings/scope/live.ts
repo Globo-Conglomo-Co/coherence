@@ -11,6 +11,7 @@
  *   /api/journal     older journal records by cursor (before=<at>~<id>), or matching a search (q=)
  *   /api/runs        older run records by cursor (before=<at>~<session>)
  *   /api/record      one journal record by id, for a citation the page has not loaded
+ *   /api/sites       every reference site of one chokepoint entry (run=<at>~<session>, component, name), where the first load counted some
  *
  * The state is loaded once through scopeState, whole, and kept current: the
  * journal, runs and work folders are watched, and an append is read back
@@ -375,6 +376,18 @@ class LiveReading implements HttpApp {
         const matching = this.base!.runs.records.filter((run) => cursor === undefined || cursor.at === "" || before(run.at, run.session, cursor));
         const page = matching.slice(-limit);
         json(response, request, 200, { records: page, more: matching.length > page.length });
+        return;
+      }
+      case "/api/sites": {
+        // Every reference site of one chokepoint entry, by its run (at~session) and enforcement: what the first load counted and did not list.
+        await this.ensure();
+        await this.chain;
+        const run = url.searchParams.get("run") ?? "";
+        const component = url.searchParams.get("component") ?? "";
+        const name = url.searchParams.get("name") ?? "";
+        const entry = this.base!.runs.records.find((r) => runKeyOf(r) === run)?.invariants.find((e) => e.component === component && e.name === name && e.form === "chokepoint");
+        if (entry?.sites === undefined) json(response, request, 404, { reason: `no chokepoint entry ${component}/${name} with sites in the run ${run}` });
+        else json(response, request, 200, { sites: entry.sites });
         return;
       }
       case "/api/record": {

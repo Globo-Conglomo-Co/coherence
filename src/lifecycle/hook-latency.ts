@@ -14,13 +14,13 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync } from "
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { TOOL_HOOKS } from "./hook-events.ts";
 
 /** Not .coherence/hooks, which holds the project's own hook voice and is committed; these are regenerated. */
 export const HOOK_TIMES_DIR = join(".coherence", "hook-times");
 /** The latency budget when the config declares none: the most seconds a tool hook may take. */
 export const DEFAULT_LATENCY_BUDGET = 3;
-/** The events that run around every tool call, which the budget holds. */
-export const TOOL_HOOKS: ReadonlySet<string> = new Set(["PreToolUse", "PostToolUse"]);
+
 /** How far back orient reads. */
 const ORIENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

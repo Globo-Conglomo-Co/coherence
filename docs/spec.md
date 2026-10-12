@@ -125,7 +125,7 @@ whose file it reads, so others can follow.
 ## Mirrors
 
 A hand list is a literal kept by hand that must equal something defined
-elsewhere: the modules a bundle joins, the events a summary may name. Where
+elsewhere: the modules a bundle joins, the tool hooks a status line counts. Where
 the list cannot simply be derived from what it mirrors, the component that
 owns it declares it as a mirror, one bullet each, with what it must equal:
 
@@ -133,8 +133,8 @@ owns it declares it as a mirror, one bullet each, with what it must equal:
 ## mirrors
 - BROWSER_SOURCES in build.ts: the modules the browser bundle joins
   mirrors: closure of page.ts
-- SUMMARY_EVENTS in telemetry.ts: the hook events a session summary may name
-  mirrors: HOOK_EVENTS in hook.ts
+- STATUS_TOOL_HOOKS in statusline.ts: the tool hooks the status line holds to the budget
+  mirrors: TOOL_HOOKS in hook-events.ts
 - RULE_NAMES in rules.ts: the rules a plural is kept for
   mirrors: keys of RULE_PLURALS in entrance-coverage.ts
 ```

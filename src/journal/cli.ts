@@ -9,7 +9,7 @@
  *   node src/cli.ts dismiss <id> --because "<why nobody will chase it>"
  *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]...
  *   node src/cli.ts experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"...
- *   node src/cli.ts experiment close <id> --result <stepId>=<pass|fail|unknown>...
+ *   node src/cli.ts experiment close <id> --result <stepId>=<result>...   (result: one of STEP_RESULTS)
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
  *   node src/cli.ts escalate "<what a human must see>" --because "<why a human>" [--human "<words>"] [--cite <id>]...
  *   node src/cli.ts acknowledge <id> --because "<what the human decided>" [--human "<words>"]
@@ -28,7 +28,7 @@
  */
 
 import { JournalError, parseFlags } from "./args.ts";
-import { KIND_NAMES } from "./record.ts";
+import { CAUGHT, KIND_NAMES, STEP_RESULTS, alternation } from "./record.ts";
 import { parseCursor, parseKind, renderDamaged, renderJson, renderOne, renderSubjects, renderTimeline, type Filters } from "./read.ts";
 import { gitBranch, loadJournal } from "./store.ts";
 import { loadWork } from "./work.ts";
@@ -159,19 +159,19 @@ export const JOURNAL_USAGE = [
   '  retract <id> --because "<what refuted it>"',
   '  conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...',
   '  resolved <conjecture-id> --because "<what the test showed>" [--as "<candidate>"]',
-  '  resolved <defect-id> --because "<what fixed it>" [--guard <component>/<invariant>] [--decision <id>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>]',
+  `  resolved <defect-id> --because "<what fixed it>" [--guard <component>/<invariant>] [--decision <id>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>]`,
   '      a defect\'s close owes a guard for its class (an invariant whose refutation is witnessed) or a decision saying why the fix suffices; spec --check names a close with neither',
   '  dismiss <id> --because "<why nobody will chase it>"',
-  '  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...',
+  `  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <${alternation(CAUGHT)}>] [--cite <id>]...`,
   '      --class is a kebab-case name declared once as the property "class <name>" of defect in a lexicon; give all three: they are what the convergence reading counts',
   '  classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>" [--over "<rejected>"]...   a decision citing the defect; the defect is never edited',
   '  experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...',
-  "  experiment close <id> --result <stepId>=<pass|fail|unknown>...",
+  `  experiment close <id> --result <stepId>=<${alternation(STEP_RESULTS)}>...`,
   '  unable "<what you could not do>" --because "<the wall>" [--cite <id>]...',
   '  escalate "<what a human must see>" --because "<why a human>" [--human "<what the human said>"] [--cite <id>]...',
   '  acknowledge <id> --because "<what the human decided>" [--human "<what the human said>"]',
   '  enact "<practice>" --step <n>=done[:<evidence>] | <n>=deviated:<why> | <n>=skipped:<why>  (one per step) [--trigger "<what fired it>"] [--cite <id>]...',
-  `  journal [--session <id>] [--agent <name>] [--kind <${KIND_NAMES.join("|")}>] [--since <cursorOrIso>] [--json]`,
+  `  journal [--session <id>] [--agent <name>] [--kind <${alternation(KIND_NAMES)}>] [--since <cursorOrIso>] [--json]`,
   "  journal --subjects [--since <cursorOrIso>]",
   "  journal <id>      one journal or work record, each record it cites, and each record citing it",
 ].join("\n");

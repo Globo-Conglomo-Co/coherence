@@ -24,27 +24,8 @@ export const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json
 export const CONFIG_FILE = "coherence.config.json";
 export { DEFAULT_PROJECT_LEXICON };
 
-export const HOSTS = ["claude", "codex"] as const;
-export type Host = (typeof HOSTS)[number];
-
-export function isHost(name: string): name is Host {
-  return (HOSTS as readonly string[]).includes(name);
-}
-
-/** The settings file each host reads, relative to the project root. */
-export const SETTINGS_FILE: Record<Host, string> = {
-  claude: ".claude/settings.json",
-  codex: ".codex/hooks.json",
-};
-
-/**
- * The personal settings file a host reads beside the shared one, relative to
- * the folder holding it, for a host that has one: Claude Code's is never
- * committed, and launched in a subfolder it reads the one at the git root.
- */
-export const LOCAL_SETTINGS_FILE: Partial<Record<Host, string>> = {
-  claude: ".claude/settings.local.json",
-};
+import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./hosts.ts";
+export { HOST_FOLDER, HOSTS, isHost, LOCAL_SETTINGS_FILE, SETTINGS_FILE, type Host } from "./hosts.ts";
 
 /** The harness's own name for the project directory, honored when it agrees with where the process runs. */
 export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";

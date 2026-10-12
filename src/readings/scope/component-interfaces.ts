@@ -435,13 +435,22 @@ export function configuredBudget(root: string): InterfaceBudget {
   return budget;
 }
 
-/** The flags that override the budget for one reading, as the scope and query commands take them. */
-export const BUDGET_FLAGS = "[--interface-seconds <n>] [--interface-memory <MB>]";
+/** Each flag that overrides the budget for one reading, the budget key it sets, and its value as usage names it. */
+const BUDGET_FLAG_TABLE = [
+  { flag: "interface-seconds", key: "seconds", value: "<n>" },
+  { flag: "interface-memory", key: "memoryMB", value: "<MB>" },
+] as const satisfies readonly { flag: string; key: keyof InterfaceBudget; value: string }[];
 
-/** The budget the flags `--interface-seconds` and `--interface-memory` give, or why a value is refused. */
+/** The budget flags' names, as every command that takes them parses them. */
+export const BUDGET_FLAG_NAMES: readonly string[] = BUDGET_FLAG_TABLE.map((f) => f.flag);
+
+/** The flags that override the budget for one reading, as the scope, query and scaffold commands' usage writes them. */
+export const BUDGET_FLAGS = BUDGET_FLAG_TABLE.map((f) => `[--${f.flag} ${f.value}]`).join(" ");
+
+/** The budget the budget flags give, or why a value is refused. */
 export function budgetFlags(values: ReadonlyMap<string, string>): Partial<InterfaceBudget> | string {
   const budget: Partial<InterfaceBudget> = {};
-  for (const [flag, key] of [["interface-seconds", "seconds"], ["interface-memory", "memoryMB"]] as const) {
+  for (const { flag, key } of BUDGET_FLAG_TABLE) {
     const value = values.get(flag);
     if (value === undefined) continue;
     const n = Number(value);

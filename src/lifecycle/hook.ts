@@ -78,7 +78,8 @@ import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -95,6 +96,7 @@ import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
@@ -106,21 +108,7 @@ import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
-export const HOOK_EVENTS = [
-  "SessionStart",
-  "SubagentStart",
-  "UserPromptSubmit",
-  "PreToolUse",
-  "PostToolUse",
-  "Stop",
-  "SubagentStop",
-] as const;
-
-export type HookEvent = (typeof HOOK_EVENTS)[number];
-
-export function isHookEvent(name: string): name is HookEvent {
-  return (HOOK_EVENTS as readonly string[]).includes(name);
-}
+export { HOOK_EVENTS, isHookEvent, type HookEvent };
 
 /** The exit code both hosts read as a refusal with the reason on stderr. */
 export const REFUSE_EXIT = 2;
@@ -666,10 +654,16 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
   const agent = agentOf(input);
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
+  if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.
   const unchecked = outcome.details.filter((d) => d.entry.verdict === "not run" && !/\bis prose\b/.test(d.entry.reason));
+  options.onEditCheck?.({
+    checked: outcome.details.filter((d) => d.entry.verdict === "pass" || d.entry.verdict === "fail").length,
+    failed: failed.map((d) => ({ invariant: `${d.entry.component}/${d.entry.name}`, ...(d.entry.bypasses[0] === undefined ? {} : { bypass: `${d.entry.bypasses[0].file}:${d.entry.bypasses[0].line} in ${d.entry.bypasses[0].symbol}` }) })),
+    unchecked: unchecked.length,
+  });
   const uncheckedText = unchecked.length === 0 ? "" : `Coherence could not check ${unchecked.length} chokepoint invariant${unchecked.length === 1 ? "" : "s"} at this edit:\n${unchecked.map((d) => `  ○ ${d.entry.component}/${d.entry.name}: ${d.entry.reason}`).join("\n")}\n`;
   if (failed.length === 0) return uncheckedText;
   const cli = await cliName(root);
@@ -787,9 +781,10 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
-  const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
+  // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
@@ -910,6 +905,27 @@ export interface HookOptions {
    * startUpdateCheck, which asks at most once a day; absent (a test), nothing is started.
    */
   updateCheck?: ((root: string, event: string) => void) | undefined;
+  /**
+   * Start the detached mirror reading at a session start and a stop, once the
+   * answer is made, never waited on: the hook never takes one. The command
+   * line passes MIRROR_REFRESH; absent (a test), nothing is started.
+   */
+  mirrors?: ((root: string) => void) | undefined;
+  /**
+   * Told the verdict of an edit's chokepoint check as data, besides the text
+   * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
+   * that marks the tool call's row for the user. Absent (the command line), nothing is told.
+   */
+  onEditCheck?: ((verdict: EditVerdict) => void) | undefined;
+}
+
+/** An edit's chokepoint check as data: how many invariants it checked, which failed (with their first bypass), and how many it could not check. */
+export interface EditVerdict {
+  checked: number;
+  failed: { invariant: string; bypass?: string }[];
+  unchecked: number;
+  /** Why the instrument could not check at all, when it could not. */
+  reason?: string;
 }
 
 /**
@@ -982,6 +998,11 @@ export const WARM_UP = (root: string): void => {
 /** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
   refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
+export const MIRROR_REFRESH = (root: string): void => {
+  refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
 };
 
 /** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
@@ -1187,6 +1208,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (event === "SessionStart") options.updateCheck?.(root, event);
+    if (event === "SessionStart" || event === "Stop") options.mirrors?.(root);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;

@@ -44,6 +44,9 @@ import {
   type Enactment,
   type StepOutcome,
   type WorkKind,
+  STEP_RESULTS,
+  alternation,
+  spoken,
 } from "./record.ts";
 import { loadSpecModel, projectPractices } from "../spec/model.ts";
 import { originFields } from "./defects.ts";
@@ -387,7 +390,7 @@ function experimentCreate(argv: string[], ctx: Context): Written {
   const ids = [...record.actions, ...record.criteria];
   const template = [
     `experiment close ${record.id} --session ${who.session} --agent ${who.agent}`,
-    ...ids.map((step) => `  --result ${step.id}=<pass|fail|unknown>`),
+    ...ids.map((step) => `  --result ${step.id}=<${alternation(STEP_RESULTS)}>`),
   ].join(" \\\n");
   return write(ctx, record, [
     ...record.actions.map((step) => `  action    ${step.id}  ${step.text}`),
@@ -396,8 +399,6 @@ function experimentCreate(argv: string[], ctx: Context): Written {
     template,
   ]);
 }
-
-const STEP_RESULTS: readonly StepResult[] = ["pass", "fail", "unknown"];
 
 function experimentClose(argv: string[], ctx: Context): Written {
   const parsed = parseFlags(argv, withCommon({ result: "many" }));
@@ -409,11 +410,11 @@ function experimentClose(argv: string[], ctx: Context): Written {
   const results: Record<string, StepResult> = {};
   for (const pair of parsed.many.get("result") ?? []) {
     const equals = pair.indexOf("=");
-    if (equals === -1) throw new JournalError(`--result "${pair}" must be <id>=<pass|fail|unknown>`);
+    if (equals === -1) throw new JournalError(`--result "${pair}" must be <id>=<${alternation(STEP_RESULTS)}>`);
     const id = pair.slice(0, equals);
     const value = pair.slice(equals + 1);
-    if (!STEP_RESULTS.includes(value as StepResult)) {
-      throw new JournalError(`--result ${id}: "${value}" is not pass, fail, or unknown`);
+    if (!(STEP_RESULTS as readonly string[]).includes(value)) {
+      throw new JournalError(`--result ${id}: "${value}" is not ${spoken(STEP_RESULTS)}`);
     }
     if (Object.hasOwn(results, id)) throw new JournalError(`--result ${id} given twice`);
     results[id] = value as StepResult;

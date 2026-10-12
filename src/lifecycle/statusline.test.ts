@@ -9,7 +9,8 @@ import { JOURNAL_DIR } from "../journal/store.ts";
 import { DEFAULT_LATENCY_BUDGET, HOOK_TIMES_DIR } from "./hook-latency.ts";
 import { PRACTICES_DIR } from "./practice-delivery.ts";
 import { serverPaths } from "../enforcement/server.ts";
-import { readStatus, STATUS_DEFAULT_BUDGET, STATUS_SOURCES, statusText } from "./statusline.ts";
+import { readStatus, STATUS_DEFAULT_BUDGET, STATUS_SOURCES, STATUS_TOOL_HOOKS, statusText } from "./statusline.ts";
+import { TOOL_HOOKS } from "./hook-events.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SESSION = "status-session";
@@ -35,6 +36,7 @@ const time = (event: string, ms: number) => ({ at: "2026-10-08T10:00:00.000Z", e
 test("the status line reads where the hooks keep the session's records, by the hooks' own names and budget", () => {
   assert.deepEqual(STATUS_SOURCES, { hookTimes: HOOK_TIMES_DIR, firings: PRACTICES_DIR, journal: JOURNAL_DIR, server: serverPaths("/p").pointer.slice("/p/".length) });
   assert.equal(STATUS_DEFAULT_BUDGET, DEFAULT_LATENCY_BUDGET);
+  assert.deepEqual([...STATUS_TOOL_HOOKS], [...TOOL_HOOKS], "the status line counts the tool hooks hook-events.ts declares");
 });
 
 test("the status line names the session's tool hook time against the budget and the practices it owes, from every leaf of a registry", () => {

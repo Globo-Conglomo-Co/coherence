@@ -545,19 +545,24 @@ function flowRunSymbols(state: ShellState): InterfaceSymbol[] {
     const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
     // An entry whose sites are unknown is named in the model's sitesUnknown, never drawn as an entry with none.
     if (entry?.sites === undefined) continue;
+    // The sites a page carries, and those its window counted by component instead: the same tally either way.
+    const counted = [
+      ...entry.sites.map((site) => ({ from: componentOfFile(site.file, components)?.folder ?? null, of: site.of, class: site.class, test: site.test, count: 1 })),
+      ...(entry.sitesLeft ?? []).map((left) => ({ ...left, from: left.component })),
+    ];
     for (const enforcement of invariant.enforcements) {
       if (enforcement.form !== "chokepoint") continue;
-      for (const site of entry.sites) {
+      for (const site of counted) {
         if (site.test || site.class === "test" || site.class === "inside") continue;
-        const from = componentOfFile(site.file, components)?.folder;
-        if (from === undefined || from === invariant.component) continue;
+        const from = site.from;
+        if (from === null || from === invariant.component) continue;
         const value = site.of === "chokepoint" ? enforcement.chokepoint : enforcement.protects;
         const named = flowNamed(value);
         const symbol = named?.symbol ?? value;
         const key = `${from}\u0000${invariant.component}\u0000${symbol}`;
         const known = tally.get(key);
-        if (known === undefined) tally.set(key, { from, to: invariant.component, symbol, file: named?.file ?? "", sites: 1 });
-        else known.sites += 1;
+        if (known === undefined) tally.set(key, { from, to: invariant.component, symbol, file: named?.file ?? "", sites: site.count });
+        else known.sites += site.count;
       }
     }
   }

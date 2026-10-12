@@ -25,7 +25,8 @@ export const STATUS_SOURCES = {
   server: join(".coherence", "run", "server.json"),
 } as const;
 export const STATUS_DEFAULT_BUDGET = 3;
-const TOOL_HOOKS = new Set(["PreToolUse", "PostToolUse"]);
+/** The tool hooks, held equal to hook-events.ts's by a test, since this module imports nothing of Coherence's. */
+export const STATUS_TOOL_HOOKS: ReadonlySet<string> = new Set(["PreToolUse", "PostToolUse"]);
 const CONFIG = "coherence.config.json";
 
 /** What Claude Code sends a status line command on stdin, as far as this reads it. */
@@ -176,7 +177,7 @@ export function readStatus(input: StatusInput): StatusReading | undefined {
   for (const dir of folders) {
     for (const t of lines(join(dir, STATUS_SOURCES.hookTimes, name))) {
       const time = t as { event?: unknown; ms?: unknown };
-      if (typeof time.event !== "string" || typeof time.ms !== "number" || !TOOL_HOOKS.has(time.event)) continue;
+      if (typeof time.event !== "string" || typeof time.ms !== "number" || !STATUS_TOOL_HOOKS.has(time.event)) continue;
       calls += 1;
       totalMs += time.ms;
       if (time.ms > budget * 1000) over += 1;
