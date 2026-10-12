@@ -94,7 +94,10 @@ async function sayWhenNotOwn($: Engine): Promise<void> {
   if (own?.kind !== 'file' || own.realPath === undefined) return
   const running = await $.fs.stat(`${$.plugin.root}/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
   if (running?.realPath === own.realPath) return
-  say($, `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`)
+  const installed = running?.realPath?.includes('/.claude/plugins/') === true
+  say($, installed
+    ? `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`
+    : `Coherence: the mod running here is ${running?.realPath?.replace(/\/\.claude-plugin\/plugin\.json$/, '') ?? $.plugin.root}, not this tree's own mods/coherence; edits there reload it, edits here do not.`)
 }
 
 async function setUp($: Engine): Promise<void> {
@@ -197,19 +200,24 @@ async function forward($: Engine, event: CoherenceEvent, input: Record<string, u
   return answer
 }
 
-/** What only the user reads: a stop's digest waits for the turn's end, anything else is a transcript line now. */
+/** A message as transcript lines: `$.ui.log` appends exactly one line, and draws a newline inside one as a stray glyph. */
+function logLines($: Engine, text: string): void {
+  for (const line of text.split('\n')) if (line.trim() !== '') $.ui.log(line)
+}
+
+/** What only the user reads: a stop's digest waits for the turn's end, anything else is transcript lines now. */
 function tell($: Engine, event: CoherenceEvent, user: string | undefined, debug: string | undefined): void {
   if (debug !== undefined && debug !== '') $.ui.log(`Coherence ${event}: ${debug}`, { to: 'debug' })
   if (user === undefined) return
   if (event !== 'Stop') {
-    $.ui.log(user)
+    logLines($, user)
     return
   }
   held.digest = user
   $.clock.after(DIGEST_WAIT_MS, () => {
     if (held.digest === user) {
       held.digest = undefined
-      $.ui.log(user)
+      logLines($, user)
     }
   })
 }
@@ -375,10 +383,12 @@ export const register: Register = on => {
   // One button in the band above the prompt, for the person: it opens Scope as /scope does, and yields to a survey.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Button } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    // A row of its own, set off from the transcript above: the tool's name dim at the left, the button drawn as one at the right.
     return (
-      <Box>
-        <Button key="scope" label="Scope ↗" plain dimColor onPress={() => void openScope($)} />
+      <Box marginTop={1} justifyContent="space-between">
+        <Text dimColor>coherence</Text>
+        <Button key="scope" label="Scope ↗" variant="primary" onPress={() => void openScope($)} />
       </Box>
     )
   })

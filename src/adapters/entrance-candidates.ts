@@ -137,7 +137,10 @@ function leadingCode(text: string): string {
   }
 }
 
-const TS_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
+/** The exports a Next.js route file answers requests by, one per HTTP method. */
+export const NEXT_ROUTE_METHODS: ReadonlySet<string> = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
+/** The exports a Remix route file runs on the server by. */
+export const REMIX_ROUTE_EXPORTS: ReadonlySet<string> = new Set(["loader", "action"]);
 
 function typescriptCandidates(file: string, text: string, wrappers: readonly string[]): EntranceCandidate[] {
   const out: EntranceCandidate[] = [];
@@ -168,7 +171,7 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
   if (nextRoute || proxyFile !== undefined) {
     // What a route or proxy file exports by name without declaring it: an export list, re-exported or local, or a destructuring
     // (export { GET, POST } from "@/app/(auth)/auth", export { auth as proxy }, export const { GET, POST } = handlers).
-    const wanted = (name: string): boolean => (nextRoute ? TS_METHODS.has(name) : name === proxyFile);
+    const wanted = (name: string): boolean => (nextRoute ? NEXT_ROUTE_METHODS.has(name) : name === proxyFile);
     for (const m of text.matchAll(/^export\s*\{([^}]*)\}|^export\s+(?:const|let|var)\s*\{([^}]*)\}\s*=/gm)) {
       const listed = m[1] !== undefined;
       const reexported = listed && /^\s*from\s*["']/.test(text.slice(m.index + m[0].length));
@@ -220,8 +223,8 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
     const fnName = fn?.[1] ?? fn?.[2];
     if (fnName !== undefined) {
       const span = spanOf(lines, i, "typescript");
-      if (nextRoute && TS_METHODS.has(fnName)) add({ file, line: i + 1, symbol: fnName, rule: "route handler", why: `export ${fnName} in a Next.js route file: answers ${fnName} requests` }, span);
-      else if (remixRoute && (fnName === "loader" || fnName === "action")) add({ file, line: i + 1, symbol: fnName, rule: "route handler", why: `export ${fnName} in app/routes: runs on the server for its route` }, span);
+      if (nextRoute && NEXT_ROUTE_METHODS.has(fnName)) add({ file, line: i + 1, symbol: fnName, rule: "route handler", why: `export ${fnName} in a Next.js route file: answers ${fnName} requests` }, span);
+      else if (remixRoute && REMIX_ROUTE_EXPORTS.has(fnName)) add({ file, line: i + 1, symbol: fnName, rule: "route handler", why: `export ${fnName} in app/routes: runs on the server for its route` }, span);
       else if (useServer && /^export\s+(?:async\s+function|const\s+\w+\s*(?::[^=]+)?=\s*async\b)/.test(line)) add({ file, line: i + 1, symbol: fnName, rule: "server action", why: `export ${fnName} in a 'use server' file: a server action a browser can call` }, span);
     }
     if (pagesApi && /^export\s+default\b/.test(line)) add({ file, line: i + 1, symbol: "", rule: "route handler", why: "the default export under pages/api: a Next.js API route" }, spanOf(lines, i, "typescript"));

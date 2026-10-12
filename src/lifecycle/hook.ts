@@ -74,7 +74,8 @@ import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -91,6 +92,7 @@ import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
@@ -101,21 +103,7 @@ import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
-export const HOOK_EVENTS = [
-  "SessionStart",
-  "SubagentStart",
-  "UserPromptSubmit",
-  "PreToolUse",
-  "PostToolUse",
-  "Stop",
-  "SubagentStop",
-] as const;
-
-export type HookEvent = (typeof HOOK_EVENTS)[number];
-
-export function isHookEvent(name: string): name is HookEvent {
-  return (HOOK_EVENTS as readonly string[]).includes(name);
-}
+export { HOOK_EVENTS, isHookEvent, type HookEvent };
 
 /** The exit code both hosts read as a refusal with the reason on stderr. */
 export const REFUSE_EXIT = 2;
@@ -788,9 +776,10 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
-  const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
+  // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
@@ -912,6 +901,12 @@ export interface HookOptions {
    */
   updateCheck?: ((root: string, event: string) => void) | undefined;
   /**
+   * Start the detached mirror reading at a session start and a stop, once the
+   * answer is made, never waited on: the hook never takes one. The command
+   * line passes MIRROR_REFRESH; absent (a test), nothing is started.
+   */
+  mirrors?: ((root: string) => void) | undefined;
+  /**
    * Told the verdict of an edit's chokepoint check as data, besides the text
    * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
    * that marks the tool call's row for the user. Absent (the command line), nothing is told.
@@ -998,6 +993,11 @@ export const WARM_UP = (root: string): void => {
 /** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
   refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
+export const MIRROR_REFRESH = (root: string): void => {
+  refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
 };
 
 /** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
@@ -1188,6 +1188,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (event === "SessionStart") options.updateCheck?.(root, event);
+    if (event === "SessionStart" || event === "Stop") options.mirrors?.(root);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;

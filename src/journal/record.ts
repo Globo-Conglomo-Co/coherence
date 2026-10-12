@@ -106,8 +106,19 @@ export interface DefectOrigin {
   caught?: Caught;
 }
 
+/** What may catch a defect: the verbs, their help, the docs and fleet telemetry all read this one list. */
 export const CAUGHT = ["review", "ci", "probe", "adopter", "self", "test"] as const;
 export type Caught = (typeof CAUGHT)[number];
+
+/** A closed list as a usage line writes it: `a|b|c`. */
+export function alternation(values: readonly string[]): string {
+  return values.join("|");
+}
+
+/** A closed list as a sentence says it: "a, b, or c". */
+export function spoken(values: readonly string[]): string {
+  return values.length < 2 ? values.join("") : `${values.slice(0, -1).join(", ")}, or ${values[values.length - 1]}`;
+}
 
 export interface Decision extends Head, Citing, HumanWords {
   kind: "decision";
@@ -185,7 +196,9 @@ export interface Experiment extends Head, Citing {
   criteria: Step[];
 }
 
-export type StepResult = "pass" | "fail" | "unknown";
+/** What one experiment step came to, as experiment close takes it. */
+export const STEP_RESULTS = ["pass", "fail", "unknown"] as const;
+export type StepResult = (typeof STEP_RESULTS)[number];
 export type Outcome = "success" | "failure" | "inconclusive";
 
 export interface Close extends Head {
@@ -312,6 +325,9 @@ export function enactmentTally(record: Enactment): string {
 export const WORK_STATES = ["open", "active", "waiting", "completed", "cancelled"] as const;
 export type WorkState = (typeof WORK_STATES)[number];
 export const TERMINAL_STATES: readonly WorkState[] = ["completed", "cancelled"];
+
+/** The states work move takes: every state but completed, which only close records. */
+export const MOVE_STATES: readonly WorkState[] = WORK_STATES.filter((s) => s !== "completed");
 
 export function isWorkState(value: string): value is WorkState {
   return (WORK_STATES as readonly string[]).includes(value);
