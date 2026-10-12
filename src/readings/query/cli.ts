@@ -18,7 +18,7 @@ import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/c
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage, projectNameOf } from "../scope/build.ts";
-import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
+import { BUDGET_FLAG_NAMES, budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
 import { readAndRecord } from "../scope/gaps.ts";
 import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
@@ -46,11 +46,10 @@ interface Parsed {
   positionals: string[];
   session: string | undefined;
   root: string | undefined;
-  /** The interface reading's budget flags (structure): --interface-seconds, --interface-memory. */
+  /** The interface reading's budget flags (structure), by BUDGET_FLAG_NAMES. */
   budget: Map<string, string>;
 }
 
-const BUDGET_FLAG_NAMES = ["interface-seconds", "interface-memory"];
 
 function parse(argv: string[]): Parsed {
   const parsed: Parsed = { positionals: [], session: undefined, root: undefined, budget: new Map() };

@@ -74,7 +74,8 @@ import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -102,21 +103,7 @@ import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
-export const HOOK_EVENTS = [
-  "SessionStart",
-  "SubagentStart",
-  "UserPromptSubmit",
-  "PreToolUse",
-  "PostToolUse",
-  "Stop",
-  "SubagentStop",
-] as const;
-
-export type HookEvent = (typeof HOOK_EVENTS)[number];
-
-export function isHookEvent(name: string): name is HookEvent {
-  return (HOOK_EVENTS as readonly string[]).includes(name);
-}
+export { HOOK_EVENTS, isHookEvent, type HookEvent };
 
 /** The exit code both hosts read as a refusal with the reason on stderr. */
 export const REFUSE_EXIT = 2;

@@ -23,6 +23,7 @@ import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
+import { HOST_FOLDER } from "../lifecycle/hosts.ts";
 export { repositoryTop };
 
 /** The most bytes one git listing may carry; a larger project is a failure worth reporting, not a truncated answer. */
@@ -224,8 +225,8 @@ export function boundedProjectFiles(root: string, ignore: readonly string[] = co
  */
 const ENVIRONMENT_FOLDERS: ReadonlySet<string> = new Set(["node_modules", "__pycache__", "site-packages"]);
 
-/** The agent hosts' and git's own folders: never the project's words, even for a walk that reads hidden folders. */
-const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ".claude", ".codex"]);
+/** The agent hosts' folders, as hosts.ts declares them, and git's own: never the project's words, even for a walk that reads hidden folders. */
+const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ...Object.values(HOST_FOLDER)]);
 
 /** A file the walks leave out, and the rule that left it out. */
 export interface Exclusion {

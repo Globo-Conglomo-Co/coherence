@@ -29,6 +29,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "./work-meter.ts";
 import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./project.ts";
+import { HOST_FOLDER } from "./hosts.ts";
 
 export const MOD_NAME = "coherence";
 export const MOD_MARKETPLACE = "coherence";
@@ -151,7 +152,7 @@ function dropDeclaration(path: string): boolean {
  * repository or for the user takes the name first and the link is not
  * loaded, so the repository never installs one.
  */
-export const OWN_MOD_LINK = join(".claude", "skills", MOD_NAME);
+export const OWN_MOD_LINK = join(HOST_FOLDER.claude, "skills", MOD_NAME);
 
 /** Whether the skills-folder link resolves to this tree's own mod. */
 export function ownModLinked(root: string): boolean {

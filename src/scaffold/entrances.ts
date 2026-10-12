@@ -18,7 +18,7 @@
  */
 
 import { posix } from "node:path";
-import type { EntranceCandidate } from "../adapters/entrance-candidates.ts";
+import { NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, type EntranceCandidate } from "../adapters/entrance-candidates.ts";
 import { languagesReadLine, type LanguagesRead } from "../readings/scope/languages-read.ts";
 import { isModuleHandler } from "../spec/grammar.ts";
 import { componentHolding } from "../spec/model.ts";
@@ -27,7 +27,8 @@ import { symbolWords } from "./control.ts";
 
 /** The exports a framework names for the route, not for what it does: the route's path names the entrance instead. */
 const ROUTE_EXPORTS = new Set(["Route", "ServerRoute", "APIRoute", "default"]);
-const METHOD_EXPORTS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "loader", "action"]);
+/** The exports named for the request they answer, as entrance detection reads them: the route's path and the export name the entrance. */
+const METHOD_EXPORTS: ReadonlySet<string> = new Set([...NEXT_ROUTE_METHODS, ...REMIX_ROUTE_EXPORTS]);
 
 /** The meaning slot: what the agent writes, never guessed from the code. */
 export const MEANING_PLACEHOLDER = "<one line: what work enters here, and from whom>";

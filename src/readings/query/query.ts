@@ -37,6 +37,7 @@ import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RU
 import type { FlowModel } from "../scope/structure-flow.ts";
 import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
+import { BUDGET_FLAGS } from "../scope/component-interfaces.ts";
 import { lexiconReviewCommand } from "../scope/model.ts";
 import { MIRRORS_USAGE } from "../mirrors/policy.ts";
 import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -53,7 +54,7 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
-  "  query structure [--interface-seconds <n>] [--interface-memory <MB>]   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial",
+  `  query structure ${BUDGET_FLAGS}   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial`,
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
