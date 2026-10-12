@@ -392,7 +392,7 @@ export interface UninstallResult {
 
 /** Whether any agent host's settings still hold a command of ours, or enable Coherence's mod. */
 async function anyHostInstalled(root: string): Promise<boolean> {
-  if (modInstalled(root).enabled) return true;
+  if (modInstalled(root)) return true;
   for (const host of HOSTS) {
     for (const name of [SETTINGS_FILE[host], LOCAL_SETTINGS_FILE[host]]) {
       if (name === undefined) continue;

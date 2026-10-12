@@ -58,17 +58,19 @@ function ready($: Engine): Promise<void> {
 
 /**
  * Where Coherence's command line is: COHERENCE_HOME's checkout; else the
- * package or checkout this mod ships in, so the mod and the command line it
- * runs are one version; else the project's install, for a mod loaded from
- * somewhere else.
+ * project's own installed Coherence, whatever its version, since this mod is
+ * one per machine and every project keeps its own; else, in Coherence's own
+ * repository, its source; else the checkout this mod was loaded from with
+ * --plugin-dir.
  */
 async function locate($: Engine): Promise<string | undefined> {
   const home = await $.env.get('COHERENCE_HOME')
+  const ownRepository = (await $.fs.stat(`${held.root}/mods/coherence/.claude-plugin/plugin.json`).catch(() => undefined))?.kind === 'file'
   const candidates = [
     ...(home === undefined || home === '' ? [] : [`${home}/src/cli.ts`]),
-    `${$.plugin.root}/../../src/cli.ts`,
-    `${$.plugin.root}/../../dist/cli.js`,
     `${held.root}/node_modules/@posthog/coherence/dist/cli.js`,
+    ...(ownRepository ? [`${held.root}/src/cli.ts`] : []),
+    `${$.plugin.root}/../../src/cli.ts`,
   ]
   for (const path of candidates) {
     const found = await $.fs.stat(path, { resolve: true }).catch(() => undefined)
