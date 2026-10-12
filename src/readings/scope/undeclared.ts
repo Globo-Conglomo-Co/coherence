@@ -23,7 +23,7 @@ import { allLanguagesRead, type LanguagesRead } from "./languages-read.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { detectedEntrances } from "./component-interfaces.ts";
-import { coverageOf, RULE_PLURALS } from "./entrance-coverage.ts";
+import { coverageOf, ruleCount } from "./entrance-coverage.ts";
 
 /** The declared entrances against what the rules detect now, and the detected entrances none covers. */
 export interface Undeclared {
@@ -71,7 +71,7 @@ export function rulesText(candidates: readonly Pick<EntranceCandidate, "rule">[]
   const tally = new Map<string, number>();
   for (const c of candidates) tally.set(c.rule, (tally.get(c.rule) ?? 0) + 1);
   const ranked = [...tally].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const named = ranked.slice(0, 2).map(([rule, n]) => `${n} ${n === 1 ? rule : (RULE_PLURALS[rule] ?? `${rule}s`)}`);
+  const named = ranked.slice(0, 2).map(([rule, n]) => ruleCount(n, rule));
   const rest = ranked.slice(2).reduce((sum, [, n]) => sum + n, 0);
   return named.join(", ") + (rest > 0 ? ` and ${rest} more` : "");
 }
