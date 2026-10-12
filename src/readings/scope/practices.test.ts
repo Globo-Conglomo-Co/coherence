@@ -7,9 +7,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KINDS, WORK_KINDS, recordId, type Kind, type WorkKind } from "../../journal/record.ts";
-import { windowJournal } from "./derive.ts";
+import { ENACTMENT_WINDOW, windowJournal } from "./derive.ts";
 import type { JournalRecord, ScopePractice, ShellState } from "./model.ts";
-import { adherence, citationKind, practiceOrigin, practiceStoryText } from "./practices.ts";
+import { STRIP_WINDOW, adherence, citationKind, practiceOrigin, practiceStoryText } from "./practices.ts";
 import { renderPracticesResults } from "./practices-view.ts";
 
 const head = (id: string, at: string) => ({ id, at, session: "s1", agent: "main", commit: null, dirty: false });
@@ -91,22 +91,39 @@ test("each step's strip classifies every enactment it shows: evidenced, claimed,
   assert.equal(wipe!.amendmentSuggested, false, "a skip is not a deviation");
 });
 
-test("the journal window keeps every enactment, every decision that cites one, and every record the practices cite, whatever its age", () => {
+test("the journal window keeps each practice's latest enactments, every amendment and what it cites, and every record the practices cite, whatever its age, and the Practices view says how many enactments it holds", () => {
+  const day = (i: number) => new Date(Date.UTC(2026, 8, 2) + i * 3_600_000).toISOString();
+  const enacted = Array.from({ length: 20 }, (_, i) => enactment(`en-${String(i).padStart(8, "0")}`, day(i), { "1": { result: i % 3 === 0 ? "skipped" : "done", because: "clean" }, "2": { result: "done", evidence: `oil ${i}` }, "3": { result: i % 4 === 0 ? "deviated" : "done", because: "by hand" } }));
   const old: JournalRecord[] = [
     { ...head("df-0000aaaa", "2026-09-01T00:00:00.000Z"), kind: "defect", what: "an old lesson", evidence: "", files: [] } as JournalRecord,
-    enactment("en-0000000a", "2026-09-02T00:00:00.000Z", { "1": { result: "done" } }),
-    enactment("en-0000000b", "2026-09-02T12:00:00.000Z", { "1": { result: "done" } }),
-    { ...head("d-0000dddd", "2026-09-03T00:00:00.000Z"), kind: "decision", chose: "amend the practice", over: [], because: "", cites: ["en-0000000a"] } as JournalRecord,
+    ...enacted,
+    { ...head("d-0000dddd", "2026-09-03T00:00:00.000Z"), kind: "decision", chose: "amend the practice", over: [], because: "", cites: ["en-00000002"] } as JournalRecord,
     { ...head("d-0000eeee", "2026-09-04T00:00:00.000Z"), kind: "decision", chose: "an unrelated old decision", over: [], because: "" } as JournalRecord,
   ];
   const recent = Array.from({ length: 30 }, (_, i) => ({ ...head(`d-1${String(i).padStart(7, "0")}`, `2026-10-0${1 + (i % 9)}T00:00:00.000Z`), kind: "decision", chose: `recent ${i}`, over: [], because: "" }) as JournalRecord);
-  const window = windowJournal([...old, ...recent], 10, [], undefined, new Set(["df-0000aaaa"]));
+  const all = [...old, ...recent];
+  const window = windowJournal(all, 10, [], undefined, new Set(["df-0000aaaa"]));
   const ids = new Set(window.records.map((r) => r.id));
-  assert.ok(ids.has("en-0000000b"), "every enactment, even one nothing cites");
-  assert.ok(ids.has("en-0000000a"), "an enactment an amendment cites");
+  const latest = enacted.slice(-ENACTMENT_WINDOW).map((e) => e.id);
+  assert.equal(ENACTMENT_WINDOW, STRIP_WINDOW, "the window keeps what the strips read");
+  for (const id of latest) assert.ok(ids.has(id), `${id}: one of the practice's latest enactments`);
+  assert.ok(ids.has("en-00000002"), "an enactment an amendment cites, however old");
   assert.ok(ids.has("d-0000dddd"), "the decision that cites an enactment: an amendment");
   assert.ok(ids.has("df-0000aaaa"), "a record a practice cites");
   assert.ok(!ids.has("d-0000eeee"), "an old record nothing needs stays out");
+  const out = enacted.filter((e) => !ids.has(e.id));
+  assert.equal(out.length, 20 - ENACTMENT_WINDOW - 1, "an older enactment nothing cites stays out");
+  assert.equal(window.records.length + window.omitted, all.length, "and is counted");
+  assert.deepEqual(adherence(practice(), window.records), adherence(practice(), all), "every strip is the one every enactment gives");
+
+  const held = enacted.filter((e) => ids.has(e.id)).length;
+  const snapshot = renderPracticesResults({ ...state([practice({ enactments: 20 })], window.records), connection: { mode: "snapshot", status: "live" } } as ShellState).text;
+  assert.ok(snapshot.includes(`Enacted 20 times; the latest ${held} on this page</summary>`), "the list says how many of every enactment it holds");
+  assert.ok(snapshot.includes(`${20 - held} earlier enactments are not embedded in this page; <code>journal --kind enactment</code> lists every one.`), "a snapshot says where the rest are");
+  const live = renderPracticesResults({ ...state([practice({ enactments: 20 })], window.records), connection: { mode: "live", status: "live", version: "v" } } as ShellState).text;
+  assert.match(live, /data-field="enactments-left">7 earlier enactments are not loaded yet\. <button type="button" class="history-load" data-history="journal">/, "a live page offers the rest");
+  const whole = renderPracticesResults(state([practice({ enactments: 20 })], all)).text;
+  assert.ok(whole.includes("Enacted 20 times</summary>") && !whole.includes('data-field="enactments-left"'), "with every enactment held, nothing is said left out");
 });
 
 test("a citation's kind is read off the minter's tables: an id of every journal and work kind names its kind, and a practice's evidence counts each", () => {

@@ -22,10 +22,10 @@
  */
 
 import { componentOfHash, journalId, resolveHash } from "./derive.ts";
-import type { JournalKind, JournalRecord, LifecycleState, RunRecord, ShellState } from "./model.ts";
+import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
-import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, parseStream } from "./updates.ts";
+import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 
 /** The state a snapshot carries inline; undefined in the shell, whose state the warm server serves. */
 function readEmbeddedState(): ShellState | undefined {
@@ -251,6 +251,24 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
     if (search !== null) {
       const query = state.journalView.query.trim();
       void loadHistory(search, `/api/journal?q=${encodeURIComponent(query)}&limit=${HISTORY_PAGE}`, "journal").then((answer) => answer !== undefined && update());
+      return;
+    }
+
+    const sites = target.closest<HTMLButtonElement>("button[data-load-sites]");
+    if (sites !== null && live !== undefined) {
+      const run = sites.dataset["loadSites"] ?? "";
+      const component = sites.dataset["component"] ?? "";
+      const name = sites.dataset["name"] ?? "";
+      sites.disabled = true;
+      void live
+        .get(`/api/sites?run=${encodeURIComponent(run)}&component=${encodeURIComponent(component)}&name=${encodeURIComponent(name)}`)
+        .then((answer) => {
+          if (mergeSites(state, run, component, name, (answer as { sites: RecordedSite[] }).sites)) update();
+        })
+        .catch((error: unknown) => {
+          sites.disabled = false;
+          sites.textContent = `Could not load (${error instanceof Error ? error.message : String(error)}); try again`;
+        });
       return;
     }
 

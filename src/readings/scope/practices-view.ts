@@ -122,9 +122,16 @@ function renderSteps(practice: ScopePractice, state: ShellState): Markup {
 
 function renderEnactmentList(practice: ScopePractice, state: ShellState): Markup {
   const mine = enactmentsOf(state.journal.records, practice.id).reverse();
-  if (mine.length === 0) return html`<p class="quiet" data-field="enactment-list">Never enacted.</p>`;
+  // The page's journal window keeps a practice's latest enactments; the spec model counts every one, so the rest are said, never dropped.
+  const left = Math.max(0, practice.enactments - mine.length);
+  if (mine.length === 0 && left === 0) return html`<p class="quiet" data-field="enactment-list">Never enacted.</p>`;
   return html`<details class="record" data-field="enactment-list">
-    <summary>Enacted ${plural(mine.length, "time", "times")}</summary>
+    <summary>Enacted ${plural(mine.length + left, "time", "times")}${left === 0 ? "" : `; the latest ${mine.length} on this page`}</summary>
+    ${left === 0
+      ? null
+      : state.connection?.mode === "live"
+        ? html`<p class="quiet history" data-field="enactments-left">${plural(left, "earlier enactment is", "earlier enactments are")} not loaded yet. <button type="button" class="history-load" data-history="journal">Load earlier journal records</button></p>`
+        : html`<p class="quiet" data-field="enactments-left">${plural(left, "earlier enactment is", "earlier enactments are")} not embedded in this page; <code>journal --kind enactment</code> lists every one.</p>`}
     <ul class="enactment-list">${mine.map((e) => {
       const outcomes = Object.values(e.results);
       const tally = (r: string): number => outcomes.filter((o) => o.result === r).length;
@@ -135,6 +142,7 @@ function renderEnactmentList(practice: ScopePractice, state: ShellState): Markup
 
 function renderPractice(practice: ScopePractice, state: ShellState): Markup {
   const origin = practiceOrigin(practice, state.journal.records);
+  const held = origin.versions.reduce((sum, v) => sum + v.enactments, 0);
   return html`<article class="entry practice" id="${practiceId(practice.id)}" data-state="${practice.state}" data-kernel="${practice.kernel ? "true" : "false"}">
     <div class="margin">
       <h3 class="headword"><a href="#${practiceId(practice.id)}">${practice.name}</a></h3>
@@ -146,7 +154,7 @@ function renderPractice(practice: ScopePractice, state: ShellState): Markup {
       <p class="triggers" data-field="triggers"><span class="label">fires</span> ${practice.triggers.map((t, i) => html`${i > 0 ? " · " : ""}${inlineCode(t.kind === "command" ? `\`${t.words}\`` : t.kind === "edit" ? `edit \`${t.glob}\`${t.adding ? ` adding \`${t.adding}\`` : ""}` : "on purpose")}`)}</p>
       ${renderSteps(practice, state)}
       ${practice.pitfalls.length === 0 ? null : html`<div class="pitfalls" data-field="pitfalls"><p class="label">Pitfalls, each witnessed</p><ul>${practice.pitfalls.map((pf) => html`<li>${pf.text.replace(/\s*\([^()]*\)\s*$/, "")} ${pf.cites.map((id, i) => html`${i > 0 ? ", " : ""}${citationLink(id, state.journal.records)}`)}</li>`)}</ul></div>`}
-      <p class="origin" data-field="origin"><span class="label">learned from</span> ${origin.learnedFrom === "" ? "nothing cited" : origin.learnedFrom}${practice.learned.length === 0 ? null : html` (${practice.learned.map((id, i) => html`${i > 0 ? ", " : ""}${citationLink(id, state.journal.records)}`)})`}${origin.versions.length > 1 ? html`; <span class="label">versions enacted</span> ${origin.versions.map((v) => `${v.version} ×${v.enactments}`).join(" → ")}` : null}${origin.amendments.length === 0 ? null : html`; <span class="label">amended by</span> ${origin.amendments.map((d, i) => html`${i > 0 ? ", " : ""}${citationLink(d.id, state.journal.records)}`)}`}</p>
+      <p class="origin" data-field="origin"><span class="label">learned from</span> ${origin.learnedFrom === "" ? "nothing cited" : origin.learnedFrom}${practice.learned.length === 0 ? null : html` (${practice.learned.map((id, i) => html`${i > 0 ? ", " : ""}${citationLink(id, state.journal.records)}`)})`}${origin.versions.length > 1 ? html`; <span class="label">versions enacted</span> ${origin.versions.map((v) => `${v.version} ×${v.enactments}`).join(" → ")}${held < practice.enactments ? ` (of the ${held} enactments on this page)` : ""}` : null}${origin.amendments.length === 0 ? null : html`; <span class="label">amended by</span> ${origin.amendments.map((d, i) => html`${i > 0 ? ", " : ""}${citationLink(d.id, state.journal.records)}`)}`}</p>
       ${practice.invariants.length === 0 ? null : html`<p class="quiet"><span class="label">serves</span> ${practice.invariants.map((name, i) => {
         const slash = name.lastIndexOf("/");
         const component = slash === -1 ? practice.component : name.slice(0, slash);

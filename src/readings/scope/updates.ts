@@ -17,7 +17,7 @@
  * Shared by the browser bundle and the Node tests; it imports types only.
  */
 
-import type { Damaged, InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
+import type { Damaged, InterfaceReading, JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState, WorkOrder } from "./model.ts";
 
 /** One event off the stream: its name and its data, still JSON text. */
 export interface StreamEvent {
@@ -114,6 +114,20 @@ export function mergeRuns(state: ShellState, records: readonly RunRecord[], olde
     else delete state.runs.omitted;
   }
   return added.length;
+}
+
+/**
+ * Take every reference site of one chokepoint entry, fetched by its run and
+ * enforcement, in place of the share the first load carried and the count of
+ * the rest. Returns whether the page held that entry.
+ */
+export function mergeSites(state: ShellState, run: string, component: string, name: string, sites: RecordedSite[]): boolean {
+  const record = state.runs.records.find((r) => runKeyOf(r) === run);
+  const at = record?.invariants.findIndex((e) => e.component === component && e.name === name && e.form === "chokepoint") ?? -1;
+  if (record === undefined || at === -1) return false;
+  const { sitesLeft: _left, ...entry } = record.invariants[at] as PageEntry;
+  record.invariants = record.invariants.map((e, i) => (i === at ? { ...entry, sites } : e));
+  return true;
 }
 
 /** Replace the work orders an update names, add the new ones, keep the rest. */
