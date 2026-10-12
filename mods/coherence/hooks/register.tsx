@@ -84,6 +84,19 @@ function say($: Engine, text: string): void {
   $.ui.log(text)
 }
 
+/**
+ * In Coherence's own repository each tree runs its own mod, linked from the
+ * project's skills folder; an installed copy takes the name first and runs
+ * instead, which nothing else would show. Said once, where the person reads it.
+ */
+async function sayWhenNotOwn($: Engine): Promise<void> {
+  const own = await $.fs.stat(`${held.root}/mods/coherence/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
+  if (own?.kind !== 'file' || own.realPath === undefined) return
+  const running = await $.fs.stat(`${$.plugin.root}/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
+  if (running?.realPath === own.realPath) return
+  say($, `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`)
+}
+
 async function setUp($: Engine): Promise<void> {
   held.root = await $.session.root()
   held.timesFile = await $.env.get('COHERENCE_MOD_TIMES')
@@ -91,6 +104,7 @@ async function setUp($: Engine): Promise<void> {
   const hooks = (await $.settings.read()).hooks
   for (const event of EVENTS) if (settingsRunCoherence(hooks, event)) held.aside.add(event)
   if (held.aside.size > 0) $.ui.log(`Coherence: the settings hooks already run Coherence for ${[...held.aside].join(', ')}; the mod leaves those to them, since answering too would run each check twice. \`coherence hooks uninstall --host claude\` hands them to the warm process.`)
+  await sayWhenNotOwn($)
   if (held.cli === undefined) say($, 'Coherence: the mod found no Coherence command line (COHERENCE_HOME, node_modules/@posthog/coherence, or the checkout it ships in); its hooks do nothing this session.')
   start($)
 }
