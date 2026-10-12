@@ -176,6 +176,37 @@ If you already have a status line, keep it by passing its command after
 `--`: `npx --no -- coherence-statusline -- ~/.claude/statusline.sh` prints
 yours first, then Coherence's.
 
+#### The Claude Code mod: one warm process per session
+
+In Claude Code you can also run Coherence's hooks through its mod instead
+of the settings hooks. The mod starts one Coherence process per session and
+sends it every event, so an event no longer pays Node's start and
+Coherence's module load, about 0.25 s each. In the PostHog monorepo a
+prompt, a read or an edit outside every adopted project drops from about
+260 ms to under 10 ms. The expensive steps (a project's first entry, a stop
+after an edit) cost about the same either way.
+
+The mod also shows Coherence's line in the status line, marks each edit's
+tool row with its check's verdict, and puts a `Scope ↗` button above the
+prompt (or run `/scope`). The agent still gets exactly what the settings
+hooks give it.
+
+```
+npx --no -- coherence hooks install --host claude --mod
+```
+
+This is personal to you in this project. It registers Coherence's repository
+as a Claude Code plugin marketplace and installs the mod from it, both in
+`.claude/settings.local.json`. The mod runs the project's own installed
+Coherence, so it works with whatever version the project uses. It also
+removes your personal Coherence settings hooks, which the mod replaces.
+Committed hooks belong to the team and stay; while they are there, the mod
+leaves the events they cover to them, and install names those events.
+`coherence hooks uninstall --host claude` removes the mod too. Claude Code
+updates the mod with `claude plugin update coherence@coherence`. Codex keeps
+the settings hooks. The measurements and the mod's limits are in
+[docs/mods-spike.md](docs/mods-spike.md).
+
 ### Decisions are never buried in a transcript
 
 The **journal** compresses hundreds of thousands of session tokens into a
@@ -555,7 +586,9 @@ runs as `prepare`, so `npm ci`, `npm pack` and an install from the git
 repository all build. `node-llama-cpp` is an optional peer: a project that
 wants the local embedding pass installs it beside Coherence.
 
-To release, merge a change that bumps `version` in package.json into main.
+To release, merge a change that bumps `version` in package.json, and the same
+`version` in `mods/coherence/.claude-plugin/plugin.json` (a test holds them
+equal), into main.
 The Release workflow sees a version npm does not have, publishes it through
 npm trusted publishing from `.github/workflows/release.yml` in the `Release`
 environment, with provenance and no stored token, and tags it as a GitHub

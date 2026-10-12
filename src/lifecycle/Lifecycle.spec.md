@@ -1201,3 +1201,36 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: in the comment mode, findings are reported and never fail the job, while a run that never happened is never mistaken for a clean one; a report read from the latest verdicts instead of the session's run would show a pass from another branch
   refuted: buildReport read every run in each project instead of the CI session's, so another session's later pass hid the failing verdict -> "ci report carries each project's problems, chokepoint verdicts, spec gaps and guard failures as Markdown, and fails only when Coherence did not finish" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
+- the warm hook process answers as the hook does: coherence hook-serve answers each event with the stdout, stderr and exit code coherence hook <event> prints for it, in arrival order, one event at a time, and keeps the same records, committed once its answer was written.
+  over: a session's start, prompt, edit (before and after), read and stop, through one hook-serve process and through one hook process per event, in two copies of one project
+  via: the warm process answers a session's events with the per-event hook's output and keeps the same records
+  because: the Claude Code mod (mods/coherence, docs/mods-spike.md) reaches Coherence through this process to spare each event Node's start; an answer or a record that differed would make the fast path a different tool from the one Codex and the settings hooks run
+  refuted: dropped the commit after hook-serve writes its answer -> "the warm process answers a session's events with the per-event hook's output and keeps the same records" went red in hook-serve.test.ts: the warm copy lacked .coherence/.gitattributes and the session's lexicon, regulate and structure records; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process never answers from stale code: hook-serve compares Coherence's code on disk with what it loaded before every request; once they differ it answers stale, runs nothing, and exits, so its client runs the event through the command line and starts a fresh process.
+  over: a ping, then an event after the code identity changed
+  via: a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line
+  because: a long-lived process outlives an edit to Coherence itself (its own repository dogfoods it) or an upgrade; the per-event hook always runs the code on disk, and the warm one must not answer differently
+  refuted: compared the code identity with itself instead of with what was loaded -> "a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line" went red in hook-serve.test.ts; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process leaves with its socket: hook-serve --socket listens in a private folder of its own, prints the socket's path first, and when its host ends it with a signal it exits 0 and removes the folder, so a client's next request fails at once and the client falls back.
+  over: a ping over the socket, the host's SIGTERM, and a request after it
+  via: over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace
+  because: a socket left behind would make a dead process look alive to the mod, and a folder left in the temporary directory is litter per session
+  refuted: removed the signal handlers -> "over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace" went red in hook-serve.test.ts: the process ended by the signal without exiting 0; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the mod is Coherence's own: Coherence's repository is the marketplace for its Claude Code mod and lists it at the package's version, and the tools whose PreToolUse the mod answers are generated from host-tools.ts's writers, never kept by hand.
+  over: package.json's version, the mod's manifest, the marketplace file, and the mod's writers file against host-tools.ts
+  via: the repository's marketplace lists the mod at the package's version, and the mod's writer tools are host-tools.ts's
+  because: a second list of the writing tools is a hand list, which drifted once already (the mod had five of host-tools.ts's seven); and Claude Code updates a plugin by its version, so a mod whose version stood still would never reach anyone
+  kinds: none
+- the mod installs for one person from Coherence's repository: coherence hooks install --host claude --mod registers Coherence's repository as a marketplace and installs the mod, both at Claude Code's personal scope, then removes Coherence's personal settings hooks, keeps the committed ones and names each event they still hold back; uninstall takes the mod out first and drops only the marketplace declaration install wrote, never the marketplace itself. In a git worktree the personal settings it reads and edits are the main checkout's, where Claude Code's personal scope keeps them.
+  over: a project with committed and personal hooks, a claude on the PATH that writes the personal settings as Claude Code's plugin commands do, a step that fails, and a worktree of the project
+  via: hooks install --mod installs the mod at the personal scope from Coherence's repository, hands it the personal hooks, keeps the team's and names them, and uninstall takes out the mod and its declaration alone
+  because: Claude Code knows a marketplace by its name on the whole machine, so registering a project's node_modules folder repointed every other project's mod at it, and removing the marketplace uninstalled the mod from every project (both seen on 2.1.295), and in a worktree its personal scope wrote the main checkout's file; the repository is one source for every project, and the mod runs each project's own Coherence; the fast path is opt-in, so it is personal, and the committed hooks are the team's to remove; the mod stands aside for any event a settings hook of Coherence's covers, so a personal hook left in place would leave it nothing to answer
+  kinds: none
+- the mod keeps Coherence's own files: While Coherence's mod is enabled, uninstalling the last settings hook of Coherence's keeps .coherence/.gitignore and .coherence/.gitattributes, because a host still runs Coherence.
+  over: a project whose committed hooks are removed while its personal settings enable the mod
+  via: while the mod is the only thing running Coherence, removing the last settings hook keeps .coherence's own files
+  because: those files keep git from seeing Coherence's regenerated state and let two branches' records merge; the mod writes the same records the hooks do, so removing them while it runs would put the state in front of git again
+  kinds: none
