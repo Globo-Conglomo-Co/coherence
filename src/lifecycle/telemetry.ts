@@ -22,8 +22,6 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
-import { HOOK_EVENTS } from "./hook-events.ts";
-import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
 import { LANGUAGES } from "../adapters/index.ts";
 import { effectiveConfig, registryForLeaf } from "../adapters/project-config.ts";
 import { projectFiles } from "../adapters/project-files.ts";
@@ -31,6 +29,8 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { HOOK_TIMES_DIR, type HookTime } from "./hook-latency.ts";
 import { TELEMETRY_TARGET, TELEMETRY_TIMEOUT_MS, type TelemetryTarget } from "./telemetry-config.ts";
+import { HOOK_EVENTS } from "./hook-events.ts";
+import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
