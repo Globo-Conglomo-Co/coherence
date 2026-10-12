@@ -1219,3 +1219,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a socket left behind would make a dead process look alive to the mod, and a folder left in the temporary directory is litter per session
   refuted: removed the signal handlers -> "over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace" went red in hook-serve.test.ts: the process ended by the signal without exiting 0; restored byte for byte, green (2026-10-09)
   kinds: none
+- the mod is the package's own: The package is the marketplace for Coherence's Claude Code mod and ships the mod at the package's version, and the tools whose PreToolUse the mod answers are generated from host-tools.ts's writers, never kept by hand.
+  over: package.json's version and files, the mod's manifest, the marketplace file, and the mod's writers file against host-tools.ts
+  via: the mod ships in the package at its version, listed by the package's marketplace, and its writer tools are host-tools.ts's
+  because: the mod runs the command line beside it, so a mod of another version speaks to a warm process it was not written for; and a second list of the writing tools is a hand list, which drifted once already (the mod had five of host-tools.ts's seven)
+  kinds: none
+- the mod installs for one person and reads from the package: coherence hooks install --host claude --mod registers the package as a marketplace and installs the mod, both at Claude Code's personal scope, from the project's node_modules entry for the package unresolved (else this installation); it then removes Coherence's personal settings hooks, keeps the committed ones and names each event they still hold back, and uninstall removes the mod first.
+  over: a project with committed and personal hooks, a claude on the PATH that writes the personal settings as Claude Code's plugin commands do, a package linked into node_modules, and a step that fails
+  via: hooks install --mod installs the mod at the personal scope from the package, hands it the personal hooks, keeps the team's and names them, and uninstall takes it out first
+  because: Claude Code reads a mod whose marketplace is a folder from that folder itself, so registering the node_modules entry makes an upgrade of the package an upgrade of the mod; the folder's path is absolute, so it can only be personal, and the committed hooks are the team's to remove; the mod stands aside for any event a settings hook of Coherence's covers, so a personal hook left in place would leave the mod nothing to answer
+  kinds: none
+- the mod keeps Coherence's own files: While Coherence's mod is enabled, uninstalling the last settings hook of Coherence's keeps .coherence/.gitignore and .coherence/.gitattributes, because a host still runs Coherence.
+  over: a project whose committed hooks are removed while its personal settings enable the mod
+  via: while the mod is the only thing running Coherence, removing the last settings hook keeps .coherence's own files
+  because: those files keep git from seeing Coherence's regenerated state and let two branches' records merge; the mod writes the same records the hooks do, so removing them while it runs would put the state in front of git again
+  kinds: none

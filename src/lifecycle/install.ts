@@ -57,6 +57,7 @@ import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SE
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
 import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
+import { modInstalled } from "./mod-install.ts";
 import { isOwnHook } from "./hook-command.ts";
 import { CLAUDE_WRITER_MATCHER, writersUnmatched } from "./host-tools.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
@@ -389,8 +390,9 @@ export interface UninstallResult {
   removedIgnore: boolean;
 }
 
-/** Whether any agent host's settings still hold a command of ours. */
+/** Whether any agent host's settings still hold a command of ours, or enable Coherence's mod. */
 async function anyHostInstalled(root: string): Promise<boolean> {
+  if (modInstalled(root).enabled) return true;
   for (const host of HOSTS) {
     for (const name of [SETTINGS_FILE[host], LOCAL_SETTINGS_FILE[host]]) {
       if (name === undefined) continue;

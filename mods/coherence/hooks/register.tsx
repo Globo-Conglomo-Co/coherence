@@ -16,10 +16,11 @@
 
 import type { EngineInterface as Engine, Register } from 'claude-code'
 import type { CoherenceVerdict } from '../types'
+import { WRITER_TOOLS } from './writers.ts'
 import { EVENTS, request, settingsRunCoherence, translate, verdictLine, type Classic, type CoherenceEvent, type HookAnswer } from './answer.ts'
 
-/** The tools whose PreToolUse Coherence's settings hook is installed for (install.ts PRACTICE_TOOLS). */
-const PRACTICE_TOOLS = new Set(['Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+/** The tools whose PreToolUse Coherence's settings hook is installed for: the tools that write, as host-tools.ts declares them. */
+const PRACTICE_TOOLS = new Set(WRITER_TOOLS)
 /** How many times a session restarts a warm process that went down before it stays on the CLI. */
 const RESTARTS = 2
 /** How long a stop's digest waits for the turn's end to show it, before it is logged instead. */
@@ -55,13 +56,19 @@ function ready($: Engine): Promise<void> {
   return held.setup
 }
 
-/** Where Coherence's command line is: COHERENCE_HOME's checkout, the project's install, or the checkout this mod ships in. */
+/**
+ * Where Coherence's command line is: COHERENCE_HOME's checkout; else the
+ * package or checkout this mod ships in, so the mod and the command line it
+ * runs are one version; else the project's install, for a mod loaded from
+ * somewhere else.
+ */
 async function locate($: Engine): Promise<string | undefined> {
   const home = await $.env.get('COHERENCE_HOME')
   const candidates = [
     ...(home === undefined || home === '' ? [] : [`${home}/src/cli.ts`]),
-    `${held.root}/node_modules/@posthog/coherence/dist/cli.js`,
     `${$.plugin.root}/../../src/cli.ts`,
+    `${$.plugin.root}/../../dist/cli.js`,
+    `${held.root}/node_modules/@posthog/coherence/dist/cli.js`,
   ]
   for (const path of candidates) {
     const found = await $.fs.stat(path, { resolve: true }).catch(() => undefined)

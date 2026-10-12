@@ -47,7 +47,11 @@
     "docs/checklist-seed.json",
     "src/*/*.practice.md",
     "docs/config.md",
-    "docs/spec.md"
+    "docs/spec.md",
+    ".claude-plugin/marketplace.json",
+    "mods/coherence/.claude-plugin/plugin.json",
+    "mods/coherence/hooks",
+    "mods/coherence/types"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",
