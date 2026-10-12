@@ -1,5 +1,6 @@
 # Coherence checks itself on every pull request and every push to main: the
-# typecheck, the unit tests, the lexicon and spec checks (npm test), and a
+# typecheck, the unit tests (in two shards), the lexicon and spec checks (what
+# npm test runs), and a
 # chokepoint run over Coherence's own invariants. A test proves code behaves;
 # only the chokepoint run proves no code reaches around a declared door, and
 # without it a bypass reached main with every test green (df-5961bdb2).
@@ -24,7 +25,51 @@ env:
   DO_NOT_TRACK: "1"
 
 jobs:
-  verify:
+  # The unit tests, split by file across two runners: the suite is bound by
+  # the runner's cores, so two shards take about half the wall time of one.
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    name: unit (${{ matrix.shard }}/2)
+    steps:
+      # Full history: a practice's pitfalls may cite commits, and the spec check confirms each exists.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      - name: Install
+        run: npm ci
+
+      # The language servers the adapters ask: neither is a dependency of the package, so an adopter brings its own.
+      - name: Language servers
+        run: npm install --global typescript-language-server@5.1.3 typescript@5.9.2 pyright@1.1.413
+
+      # The Python test runner and tach, into .venv, where the tests look for them.
+      - name: Python test tools
+        run: npm run test:setup
+
+      # Some fixtures commit to throwaway repositories.
+      - name: Git identity
+        run: |
+          git config --global user.email "ci@coherence.invalid"
+          git config --global user.name "Coherence CI"
+
+      - name: Unit tests
+        env:
+          COHERENCE_TEST_SHARD: ${{ matrix.shard }}/2
+        run: npm run test:unit
+
+  # Everything in npm test but the unit tests, beside them, and the chokepoint run.
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,12 +108,25 @@ jobs:
           git config --global user.email "ci@coherence.invalid"
           git config --global user.name "Coherence CI"
 
-      - name: Typecheck, unit tests, lexicon and spec checks
-        run: npm test
+      - name: Typecheck, lexicon and spec checks
+        run: npm run -s typecheck && npm run -s lexicon:check && npm run -s spec:check
 
       # Every chokepoint graded in-process (no warm server); a broken one fails the run.
       - name: Chokepoints
         run: node --disable-warning=ExperimentalWarning src/cli.ts run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci
+
+  # One check that stands for the rest: green only when every shard and the checks are.
+  verify:
+    if: always()
+    needs: [unit, checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every shard and check passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   # One session's hooks over a synthetic monorepo of about 5,000 files under a
   # registry of three products, warm-up on: each event's wall time against
@@ -94,3 +152,7 @@ jobs:
 
       - name: Scale benchmark
         run: node --disable-warning=ExperimentalWarning bench/scale/run.ts
+
+      # The prefilter over Coherence's own tree, read both ways: the unit suite proves it on fixtures; this reads the whole tree twice, so it lives here, out of the unit suite's time.
+      - name: Prefilter over Coherence's own tree
+        run: node --disable-warning=ExperimentalWarning bench/interfaces/own-tree.ts
