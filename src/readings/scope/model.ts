@@ -206,20 +206,37 @@ export type SpecChecklistLine =
   | { shape: string; outcome: "declared"; as: string; line: number }
   | { shape: string; outcome: "dismissed"; reason: string; line: number };
 
-/** The lifecycle state of a bullet, as src/spec derives it. */
-export type LifecycleState = "requirement" | "invariant" | "structural defect";
-
-export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
+/** The lifecycle state of a bullet and what it lacks, as src/spec derives them: its own types, imported as types, which the bundle strips. */
+export type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { PracticeState } from "../../spec/practices.ts";
+import type { Reach } from "../../spec/practice.ts";
 
 export type { Form, Verdict, Grade, Governed, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
 import type { ChokepointFrom } from "../../spec/grammar.ts";
-import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+import type { Bypass, Form, Grade, RecordedSite, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+
+/**
+ * Reference sites of one entry a page does not carry, counted by what every
+ * derivation over sites reads: the component the site is in (null for none),
+ * the endpoint, the class and the test mark. Set only by a page's window on a
+ * latest chokepoint entry, beside the sites it carries; never written to a run.
+ */
+export interface SiteTally {
+  component: string | null;
+  of: RecordedSite["of"];
+  class: RecordedSite["class"];
+  test: boolean;
+  count: number;
+}
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
 export interface LatestEntry extends RunEntry {
   at: string;
   commit: string | null;
   session: string;
+  /** On a page: the entry's sites the window left out, counted (see SiteTally). Absent when the page carries every site. */
+  sitesLeft?: SiteTally[];
 }
 
 export interface SpecInvariant {
@@ -353,9 +370,13 @@ export interface RunsData {
   superseded?: Record<string, { pass: number; fail: number; notRun: number }>;
 }
 
+/** A run entry as a page may carry it: the window can leave some of a latest chokepoint entry's sites out, counted. */
+export type PageEntry = RunEntry & { sitesLeft?: SiteTally[] };
+
 /* The journal, as src/journal records it. */
 
 import type { Kind } from "../../journal/kinds.ts";
+import type { Outcome, StepResult } from "../../journal/record.ts";
 
 /** The journal's kinds, as its minter's table names them: a kind added there is one every Record<JournalKind, …> here must name. */
 export type JournalKind = Kind;
@@ -388,7 +409,7 @@ export type JournalRecord =
   | (JournalHead & { kind: "dismissal"; of: string; because: string })
   | (JournalHead & { kind: "defect"; what: string; evidence: string; files: string[] })
   | (JournalHead & { kind: "experiment"; expectation: string; context: string[]; actions: JournalStep[]; criteria: JournalStep[] })
-  | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
+  | (JournalHead & { kind: "close"; of: string; results: Record<string, StepResult>; outcome: Outcome })
   | (JournalHead & { kind: "unable"; what: string; because: string })
   | (JournalHead & { kind: "escalation"; what: string; because: string })
   | (JournalHead & { kind: "acknowledgement"; of: string; because: string })
@@ -636,7 +657,7 @@ export interface ScopePractice {
   component: string;
   file: string;
   kernel: boolean;
-  reach?: "kernel" | "internal" | undefined;
+  reach?: Reach | undefined;
   triggers: PracticeTrigger[];
   steps: { n: number; text: string; leaves?: string | undefined }[];
   pitfalls: { text: string; cites: string[] }[];
@@ -644,7 +665,7 @@ export interface ScopePractice {
   invariants: string[];
   because?: string | undefined;
   version: string;
-  state: "candidate" | "established";
+  state: PracticeState;
   enactments: number;
 }
 

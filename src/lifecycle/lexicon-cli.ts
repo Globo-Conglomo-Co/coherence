@@ -16,7 +16,9 @@ import { recordBaseline } from "./lexicon-baseline.ts";
 import {
   attention,
   coverageText,
+  DISPOSITIONS,
   digest,
+  isSettled,
   lexiconCoverage,
   liveUses,
   readingPaths,
@@ -24,6 +26,7 @@ import {
   type Coverage,
 } from "./lexicon-coverage.ts";
 import {
+  CHANGE_ACTIONS,
   applyProposal,
   confined,
   lexiconTarget,
@@ -38,8 +41,8 @@ import {
 export const LEXICON_WORK_USAGE = `  lexicon coverage [--json] [<path>...]   recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
                                           <path>: read only the project's files under these folders or files, relative to the root or absolute inside it
   lexicon review <term> [--json]          definition, live contexts, evidence keys and prior rulings
-  lexicon review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--cite <id>]
-  lexicon propose declare|define|alias|reject|lift|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--drop <field.key>]... [--qualify] --because <reason>
+  lexicon review <term> --component <folder> --evidence <key> --disposition ${DISPOSITIONS.join("|")} --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--cite <id>]
+  lexicon propose ${CHANGE_ACTIONS.join("|")} <concept> [value] [--definition <text>] [--entry <file.json>] [--drop <field.key>]... [--qualify] --because <reason>
                                           define --drop properties.<key>|detail.<key>: remove that key; the removed text goes into the applying decision
                                           lift <concept> <name>: take a rejected name back; apply needs --human and --cite of the decision that rejected it
                                           rename --qualify: the old name keeps its other senses and is not rejected
@@ -313,9 +316,7 @@ export async function lexiconWorkCommand(
         extra.length ||
         !action ||
         !name ||
-        !["declare", "define", "alias", "reject", "lift", "rename", "retire"].includes(
-          action,
-        )
+        !(CHANGE_ACTIONS as readonly string[]).includes(action)
       )
         throw new Error(
           "propose needs an action and concept; see lexicon help",
@@ -525,11 +526,7 @@ export async function lexiconWorkCommand(
               },
             ]
           : found.contexts
-              .filter(
-                (c) =>
-                  c.disposition !== "confirmed" &&
-                  c.disposition !== "not-domain",
-              )
+              .filter((c) => !isSettled(c.disposition))
               .map((c) => ({
                 term: name,
                 reason: `${c.component}: ${c.disposition}`,

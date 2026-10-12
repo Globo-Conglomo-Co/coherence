@@ -84,6 +84,22 @@ function say($: Engine, text: string): void {
   $.ui.log(text)
 }
 
+/**
+ * In Coherence's own repository each tree runs its own mod, linked from the
+ * project's skills folder; an installed copy takes the name first and runs
+ * instead, which nothing else would show. Said once, where the person reads it.
+ */
+async function sayWhenNotOwn($: Engine): Promise<void> {
+  const own = await $.fs.stat(`${held.root}/mods/coherence/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
+  if (own?.kind !== 'file' || own.realPath === undefined) return
+  const running = await $.fs.stat(`${$.plugin.root}/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
+  if (running?.realPath === own.realPath) return
+  const installed = running?.realPath?.includes('/.claude/plugins/') === true
+  say($, installed
+    ? `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`
+    : `Coherence: the mod running here is ${running?.realPath?.replace(/\/\.claude-plugin\/plugin\.json$/, '') ?? $.plugin.root}, not this tree's own mods/coherence; edits there reload it, edits here do not.`)
+}
+
 async function setUp($: Engine): Promise<void> {
   held.root = await $.session.root()
   held.timesFile = await $.env.get('COHERENCE_MOD_TIMES')
@@ -91,6 +107,7 @@ async function setUp($: Engine): Promise<void> {
   const hooks = (await $.settings.read()).hooks
   for (const event of EVENTS) if (settingsRunCoherence(hooks, event)) held.aside.add(event)
   if (held.aside.size > 0) $.ui.log(`Coherence: the settings hooks already run Coherence for ${[...held.aside].join(', ')}; the mod leaves those to them, since answering too would run each check twice. \`coherence hooks uninstall --host claude\` hands them to the warm process.`)
+  await sayWhenNotOwn($)
   if (held.cli === undefined) say($, 'Coherence: the mod found no Coherence command line (COHERENCE_HOME, node_modules/@posthog/coherence, or the checkout it ships in); its hooks do nothing this session.')
   start($)
 }
@@ -183,19 +200,24 @@ async function forward($: Engine, event: CoherenceEvent, input: Record<string, u
   return answer
 }
 
-/** What only the user reads: a stop's digest waits for the turn's end, anything else is a transcript line now. */
+/** A message as transcript lines: `$.ui.log` appends exactly one line, and draws a newline inside one as a stray glyph. */
+function logLines($: Engine, text: string): void {
+  for (const line of text.split('\n')) if (line.trim() !== '') $.ui.log(line)
+}
+
+/** What only the user reads: a stop's digest waits for the turn's end, anything else is transcript lines now. */
 function tell($: Engine, event: CoherenceEvent, user: string | undefined, debug: string | undefined): void {
   if (debug !== undefined && debug !== '') $.ui.log(`Coherence ${event}: ${debug}`, { to: 'debug' })
   if (user === undefined) return
   if (event !== 'Stop') {
-    $.ui.log(user)
+    logLines($, user)
     return
   }
   held.digest = user
   $.clock.after(DIGEST_WAIT_MS, () => {
     if (held.digest === user) {
       held.digest = undefined
-      $.ui.log(user)
+      logLines($, user)
     }
   })
 }
@@ -361,10 +383,12 @@ export const register: Register = on => {
   // One button in the band above the prompt, for the person: it opens Scope as /scope does, and yields to a survey.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Button } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    // A row of its own, set off from the transcript above: the tool's name dim, its button drawn as one right beside it, whatever the width.
     return (
-      <Box>
-        <Button key="scope" label="Scope ↗" plain dimColor onPress={() => void openScope($)} />
+      <Box marginTop={1} gap={2}>
+        <Text dimColor>coherence</Text>
+        <Button key="scope" label="Scope ↗" variant="primary" onPress={() => void openScope($)} />
       </Box>
     )
   })

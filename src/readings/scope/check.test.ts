@@ -13,12 +13,14 @@ import { after, before, test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
-import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
+import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, windowState, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { CITED_WINDOW, windowJournal, windowRuns, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
+import { CITED_WINDOW, SITE_WINDOW, componentOfFile, sitesLeftCount, windowJournal, windowRuns, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Lexicon, LexiconCoverage, RecordedSite, RunRecord, ShellState, StructurePreview, WorkOrder } from "./model.ts";
+import type { LatestEntry, Lexicon, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, SiteTally, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
+import { flowOf } from "./structure-flow.ts";
+import { mergeSites } from "./updates.ts";
 
 const options: BuildOptions = {
   lexiconPath: DEFAULTS.lexiconPath,
@@ -715,19 +717,88 @@ test("another project's tree builds as a second root: its lexicon is the domain 
   }
 });
 
-test("the page's run window keeps every latest entry whole and drops reference sites only from superseded entries", async () => {
-  const windowed = (await buildScopePage(options)).state;
-  const whole = (await buildScopePage({ ...options, window: false })).state;
-  for (const invariant of windowed.spec.components.flatMap((c) => c.invariants)) {
-    assert.deepEqual(latestOf(invariant, windowed.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the latest entries, sites included, are the same over the window`);
-  }
-  const holders = new Map<string, number>();
-  windowed.runs.records.forEach((run, index) => { for (const e of run.invariants) holders.set(`${e.component}\u0000${e.name}\u0000${e.form}`, index); });
-  windowed.runs.records.forEach((run, index) => {
-    for (const e of run.invariants) if (holders.get(`${e.component}\u0000${e.name}\u0000${e.form}`) !== index) assert.equal(e.sites, undefined, `${e.name}: a superseded entry carries no sites`);
-  });
-});
+test("the first load carries at most the site window's reference sites however many chokepoints and sites the runs record, counts every site it leaves out, and derives every site count unchanged", async () => {
+  const components = fixtureState.spec.components;
+  // An entry's sites by the keys the window counts them by, carried and counted alike.
+  const keyed = (sites: readonly RecordedSite[], left: readonly SiteTally[] = []): [string, number][] => {
+    const counts = new Map<string, number>();
+    const add = (key: string, n: number): void => void counts.set(key, (counts.get(key) ?? 0) + n);
+    for (const s of sites) add(`${componentOfFile(s.file, components)?.folder ?? ""} ${s.of} ${s.class} ${s.test}`, 1);
+    for (const t of left) add(`${t.component ?? ""} ${t.of} ${t.class} ${t.test}`, t.count);
+    return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+  };
+  const files = ["src/api/handler.ts", "src/api/route.ts", "src/store/write.ts", "src/store/cache/hot.ts", "src/api/handler.test.ts", "bin/main.ts"];
+  const siteAt = (i: number): RecordedSite => {
+    const file = files[i % files.length]!;
+    const test = file.endsWith(".test.ts");
+    return { file, line: i + 1, symbol: `s${i}`, class: file.startsWith("src/store/") ? "inside" : test ? "test" : file.startsWith("bin/") ? "exempt" : "chokepoint-reference", of: i % 2 === 0 ? "chokepoint" : "protected", test };
+  };
+  const bypass = (i: number): RecordedSite => ({ file: "src/api/handler.ts", line: 9000 + i, symbol: "handle", class: "bypass", of: "protected", test: false });
 
+  // However many chokepoints: the window is the page's, not each entry's.
+  for (const chokepoints of [5, 60]) {
+    const entries = Array.from({ length: chokepoints }, (_, c) => ({ component: "src/store", name: `door ${c}`, form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "r", sites: [...Array.from({ length: 400 }, (_, i) => siteAt(i)), bypass(2 * c), bypass(2 * c + 1)] }));
+    const few = { ...entries[0]!, name: "small door", sites: [siteAt(1), siteAt(2), siteAt(3)] };
+    const run = { at: "2026-10-01T00:00:00.000Z", session: "s-sites", agent: "a", commit: null, dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 1, invariants: [...entries, few] } as unknown as RunRecord;
+    const window = windowRuns([run], undefined, components);
+    const carried = window.records[0]!.invariants as PageEntry[];
+    const listed = carried.reduce((sum, e) => sum + e.sites!.filter((s) => s.class !== "bypass").length, 0);
+    assert.ok(listed <= SITE_WINDOW, `${chokepoints} chokepoints: ${listed} sites carried, at most the window's ${SITE_WINDOW}`);
+    assert.ok(listed >= SITE_WINDOW - 2 * chokepoints - chokepoints, `${chokepoints} chokepoints: the window is used, not left idle (${listed})`);
+    assert.equal(carried.reduce((sum, e) => sum + e.sites!.filter((s) => s.class === "bypass").length, 0), 2 * chokepoints, "every bypass site is carried");
+    carried.forEach((entry, i) => {
+      const whole = run.invariants[i]!.sites!;
+      assert.deepEqual(keyed(entry.sites!, entry.sitesLeft), keyed(whole), `${entry.name}: every site is carried or counted by its keys`);
+      assert.equal(entry.sites!.length + sitesLeftCount(entry), whole.length);
+      assert.ok(entry.sites!.every((s) => whole.includes(s)), `${entry.name}: what is carried is the run's own sites`);
+    });
+    assert.equal(carried.at(-1)!.sitesLeft, undefined, "an entry within its share carries every site and counts none");
+    assert.equal(carried.at(-1)!.sites!.length, 3);
+  }
+
+  // Every count derived from sites is the one every site gives: map weights, bypass sites, exempt references, reliance totals.
+  const whole = fresh();
+  const sites = [...Array.from({ length: 2000 }, (_, i) => siteAt(i)), bypass(0)];
+  setSingleWriterSites(whole, sites);
+  const last = whole.runs.records.at(-1)!;
+  last.invariants.find((e) => e.name === "single writer" && e.form === "chokepoint")!.from = { value: "outside bin", by: "bullet", exempt: "bin" };
+  const windowed = windowState(whole);
+  const writer = windowed.spec.components.flatMap((c) => c.invariants).find((i) => i.name === "single writer")!;
+  const carried = latestOf(writer, windowed.runs.records).find((e) => e.form === "chokepoint")!;
+  assert.ok(carried.sites!.length < sites.length && sitesLeftCount(carried) === sites.length - carried.sites!.length, "the window carries part of the sites and counts the rest");
+  const weights = (state: ShellState) => flowOf(state).edges.map((edge) => [edge.id, edge.sites]);
+  assert.ok(weights(whole).length > 0, "the run sites draw interfaces");
+  assert.deepEqual(weights(windowed), weights(whole), "the map's reference weights are unchanged");
+  assert.deepEqual(flowOf(windowed).nodes.map((n) => n.defects), flowOf(whole).nodes.map((n) => n.defects), "every bypass site is unchanged");
+  const governs = (state: ShellState) => /data-field="from"[\s\S]*?<\/p>/.exec(renderView(state, "invariants").text)?.[0];
+  assert.match(governs(whole) ?? "", /\d+ references from inside it exempt/);
+  assert.equal(governs(windowed), governs(whole), "the exempt references are counted the same");
+  const chokepoint = flowChokepointId("src/store", "single writer");
+  const left = sites.length - carried.sites!.length;
+  const snapshot = selectedOn(windowed, chokepoint);
+  assert.ok(snapshot.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first. This page lists ${carried.sites!.length} of them.`), "the listing says how many sites there are and how many it lists");
+  assert.match(snapshot, new RegExp(`data-field="sites-left" data-left="${left}">${left} more sites are counted and not listed \\([^)]*in src/api[^)]*\\): <code>query relies-on write</code> lists every one`), "a snapshot says where the rest are");
+  const live = { ...windowed, connection: { mode: "live", status: "live", version: "v" } } as ShellState;
+  assert.match(selectedOn(live, chokepoint), new RegExp(`data-load-sites="${last.at}~${last.session}" data-component="src/store" data-name="single writer">Load the other ${left}</button>`), "a live page offers the rest");
+  assert.ok(mergeSites(live, `${last.at}~${last.session}`, "src/store", "single writer", sites), "the fetched sites replace the share");
+  const loaded = selectedOn(live, chokepoint);
+  assert.doesNotMatch(loaded, /data-field="sites-left"/, "and nothing is left counted");
+  assert.ok(loaded.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first.</p>`));
+
+  // Over Coherence's own runs: every latest verdict, and every chokepoint's sites carried or counted.
+  const own = (await buildScopePage(options)).state;
+  const ownWhole = (await buildScopePage({ ...options, window: false })).state;
+  const bare = (e: LatestEntry) => (({ sites: _s, sitesLeft: _l, ...rest }) => rest)(e);
+  for (const invariant of own.spec.components.flatMap((c) => c.invariants)) {
+    const [a, b] = [latestOf(invariant, own.runs.records), latestOf(invariant, ownWhole.runs.records)];
+    assert.deepEqual(a.map(bare), b.map(bare), `${invariant.name}: the latest entries are the same over the window`);
+    a.forEach((e, i) => {
+      if (b[i]!.sites !== undefined) assert.equal(e.sites!.length + sitesLeftCount(e), b[i]!.sites!.length, `${invariant.name}: every site carried or counted`);
+    });
+  }
+  assert.ok(own.runs.records.flatMap((r) => r.invariants).reduce((sum, e) => sum + (e.sites?.filter((s) => s.class !== "bypass").length ?? 0), 0) <= SITE_WINDOW, "Coherence's own page carries at most the window");
+  assert.deepEqual(weights(own), weights(ownWhole), "and its map's weights are the whole runs'");
+});
 
 test("an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view", () => {
   const entry = (name: string, verdict: "pass" | "fail" | "not run") =>

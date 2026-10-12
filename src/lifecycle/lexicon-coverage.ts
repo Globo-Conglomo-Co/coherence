@@ -58,6 +58,7 @@ import {
 import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from "./project.ts";
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { singularForms } from "./inflection.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
 
 export { proseNominations };
@@ -224,18 +225,9 @@ function table(
   }
 }
 
-/** The singulars a word may be the plural of, as the reading merges a plural into its singular. */
-export function singularForms(word: string): string[] {
-  return singular(word);
-}
-
-function singular(word: string): string[] {
-  const out: string[] = [];
-  if (word.endsWith("ies") && word.length > 4) out.push(word.slice(0, -3) + "y");
-  if (/(?:ss|sh|ch|x|z)es$/.test(word)) out.push(word.slice(0, -2));
-  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) out.push(word.slice(0, -1));
-  return out;
-}
+/** The singulars a word may be the plural of, as the reading merges a plural into its singular: the check's own rules (inflection.ts). */
+export { singularForms };
+const singular = singularForms;
 
 /** Inflection is accepted only when its conservative singular is an already-known complete name. */
 function knownMeaning(term: string, known: Map<string, KnownMeaning>): KnownMeaning | undefined {
@@ -988,9 +980,14 @@ export interface Attention {
   senses: { term: string; component: string; reason: string; evidence: string; state: string }[];
 }
 
+/** What a sense review may rule about a context. */
+export const DISPOSITIONS = ["confirmed", "not-domain", "deferred", "defect"] as const;
+/** The rulings that settle a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
+const SETTLING: ReadonlySet<string> = new Set<(typeof DISPOSITIONS)[number]>(["confirmed", "not-domain"]);
+
 /** Whether a review has settled a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
 export function isSettled(disposition: string): boolean {
-  return disposition === "confirmed" || disposition === "not-domain";
+  return SETTLING.has(disposition);
 }
 
 /**

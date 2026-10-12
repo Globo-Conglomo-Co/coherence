@@ -57,11 +57,14 @@ export interface Registry {
 }
 
 /** The keys a leaf never inherits. */
-const OWN_KEYS: ReadonlySet<string> = new Set(["name", "entryDir", "lexicon", "projects"]);
+export const OWN_KEYS: ReadonlySet<string> = new Set(["name", "entryDir", "lexicon", "projects"]);
 /** The keys a leaf's own value adds to the registry's rather than replaces. */
-const CONCATENATED: ReadonlySet<string> = new Set(["ignore", "wellKnown"]);
-/** The test keys, inherited or replaced as one group. */
-export const TEST_KEYS: ReadonlySet<string> = new Set(["tests", "test", "testJson", "testMatch", "testFilterForm", "testDir", "testDirs"]);
+export const CONCATENATED: ReadonlySet<string> = new Set(["ignore", "wellKnown"]);
+/** The keys one test setup reads, top level or in each entry of tests; enforcement/config.ts reads a setup through these alone, so a key it reads is one this names. */
+export const SETUP_KEYS = ["test", "testJson", "testMatch", "testFilterForm", "testDir", "testDirs"] as const;
+export type SetupKey = (typeof SETUP_KEYS)[number];
+/** The test keys, inherited or replaced as one group: tests and every setup key. */
+export const TEST_KEYS: ReadonlySet<string> = new Set(["tests", ...SETUP_KEYS]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

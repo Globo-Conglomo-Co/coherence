@@ -1503,7 +1503,7 @@
    "component": "Lifecycle",
    "name": "a status line render loads no hook module",
    "shape": "other",
-   "why": "an import-graph property of the status line (built-ins only), not references to one symbol"
+   "why": "an import-closure property of the status line (built-ins only), not references to one symbol"
   },
   {
    "component": "Lifecycle",
@@ -2151,7 +2151,7 @@
    "component": "Scope",
    "name": "the kept answers rest on all the adapters' code",
    "shape": "derivation",
-   "why": "the basis is derived from the adapters' import graph"
+   "why": "the basis is derived from the adapters' import closure"
   },
   {
    "component": "Scope",

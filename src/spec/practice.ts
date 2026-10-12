@@ -24,6 +24,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { KINDS, WORK_KINDS } from "../journal/kinds.ts";
 
 export const PRACTICE_SUFFIX = ".practice.md";
 
@@ -90,8 +91,8 @@ export interface ParsedPractices {
   problems: PracticeProblem[];
 }
 
-/** A journal or work record id: the kind's prefix and eight hex digits. */
-export const RECORD_ID = /\b(?:d|rt|c|rs|dm|df|x|xc|u|e|ak|en|w|wm|wo|wc)-[0-9a-f]{8}\b/g;
+/** A journal or work record id: a prefix the minter's tables declare (journal/kinds.ts) and eight hex digits. */
+export const RECORD_ID = new RegExp(`\\b(?:${[...Object.values(KINDS), ...Object.values(WORK_KINDS)].join("|")})-[0-9a-f]{8}\\b`, "g");
 /** A commit, abbreviated or whole: seven to forty hex digits standing alone. */
 const COMMIT = /(?<![\w-])[0-9a-f]{7,40}(?![\w-])/g;
 

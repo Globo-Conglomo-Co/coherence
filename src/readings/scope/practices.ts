@@ -14,11 +14,11 @@
 
 import { KINDS, WORK_KINDS } from "../../journal/kinds.ts";
 import { slug } from "./html.ts";
-import { citesOf, componentOfFile } from "./derive.ts";
+import { ENACTMENT_WINDOW, citesOf, componentOfFile } from "./derive.ts";
 import type { JournalRecord, PracticeTrigger, ScopePractice, ShellState, SpecComponent } from "./model.ts";
 
 /** How many of a practice's latest enactments its strips show. */
-export const STRIP_WINDOW = 12;
+export const STRIP_WINDOW = ENACTMENT_WINDOW;
 
 /** Deviations on one step, within the strip, that suggest the step itself should change. */
 export const AMENDMENT_SIGNAL = 2;

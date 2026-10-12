@@ -288,7 +288,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
  * window, so its answers read every record.
  */
 export function windowState(state: ShellState): ShellState {
-  const runs = windowRuns(state.runs.records);
+  const runs = windowRuns(state.runs.records, undefined, state.spec.components);
   const cited = new Set(state.practices.practices.flatMap((p) => [...p.pitfalls.flatMap((pf) => pf.cites), ...p.learned]));
   const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {

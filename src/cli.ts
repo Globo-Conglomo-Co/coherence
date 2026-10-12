@@ -20,9 +20,9 @@
  *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hook-serve [--socket]    the warm hook process: answer events as JSON lines on stdin, and over a Unix socket (hook-serve.ts)
- *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
- *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
- *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
+ *   coherence hooks install --host <host>           merge one entry per event into the agent host's settings
+ *   coherence hooks uninstall --host <host>         remove exactly those entries; every other hook stays
+ *   coherence hooks --check --host <host>           exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence ci install --host github --mode fail|comment [--write]   the workflow that runs Coherence on every pull request (ci.ts)
  *   coherence ci report --session <id>   the pull request report as Markdown (ci-report.ts)
@@ -48,7 +48,7 @@ import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
+import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { runHookServe } from "./lifecycle/hook-serve.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
@@ -60,7 +60,7 @@ import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
 import { keepAttributes, keepIgnore } from "./lifecycle/state-files.ts";
-import { installMod, modInstalled, uninstallMod, MOD_ID, MOD_REPOSITORY, type ModStep } from "./lifecycle/mod-install.ts";
+import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
@@ -215,7 +215,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, startedAt: Math.round(performance.timeOrigin) });
+  const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: Math.round(performance.timeOrigin) });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -234,12 +234,19 @@ async function hookCommand(args: string[], root: string): Promise<number> {
 async function hookServeCommand(args: string[], root: string): Promise<number> {
   const unknown = args.filter((arg) => arg !== "--socket");
   if (unknown.length > 0) fail(`hook-serve: unexpected ${unknown.join(" ")}\n${USAGE}`);
-  const code = await runHookServe(root, { socket: args.includes("--socket"), hook: { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck } });
+  const code = await runHookServe(root, { socket: args.includes("--socket"), hook: HOOK_STARTS });
   // Stdin and the socket hold the event loop open; the process is done once the server says so.
   process.exit(code);
 }
 
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
+/**
+ * What a hook starts in the background once its answer is made, given alike
+ * to the per-event hook and to the warm hook process, so both paths start the
+ * same work and keep the same records.
+ */
+const HOOK_STARTS = { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH } as const;
+
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
   install: new Set(["host", "command", "local", "mod", "shared"]),
   uninstall: new Set(["host"]),
@@ -310,6 +317,14 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
+      if (host === "claude" && !local && (await isCoherenceItself(place.dir))) {
+        // Coherence's own repository runs the tree's own mod from its skills folder, in place of hooks and of an installed copy.
+        const linked = ownModLinked(place.dir);
+        const shadowed = modInstalled(place.dir) || modInstalled(place.dir, "project");
+        process.stdout.write(!linked ? `claude: ${OWN_MOD_LINK} does not link this tree's mods/coherence, so no mod runs here\n` : shadowed ? `claude: ${MOD_ID} is installed for this repository and takes the name before ${OWN_MOD_LINK}, so the installed copy runs instead of this tree's mod; hooks uninstall --host claude removes it\n` : `claude: this tree's own mod runs from ${OWN_MOD_LINK} and reloads when a file of it is saved\n`);
+        drifted ||= !linked || shadowed;
+        continue;
+      }
       if (host === "claude" && modInstalled(place.dir, local ? "local" : "project")) {
         // The mod answers every event in place of the settings hooks at this scope.
         process.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
@@ -328,6 +343,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
     return drifted ? 1 : 0;
   }
   if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
+  if (flags.get("mod") === true && (await isCoherenceItself(root))) fail(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead\n${USAGE}`);
   if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(root, host, shared, given !== undefined || local) : modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);

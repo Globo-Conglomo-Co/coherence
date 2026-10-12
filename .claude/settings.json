@@ -1,13 +1,1 @@
-{
-  "extraKnownMarketplaces": {
-    "coherence": {
-      "source": {
-        "source": "github",
-        "repo": "PostHog/coherence"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "coherence@coherence": true
-  }
-}
+{}
