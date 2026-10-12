@@ -94,7 +94,10 @@ async function sayWhenNotOwn($: Engine): Promise<void> {
   if (own?.kind !== 'file' || own.realPath === undefined) return
   const running = await $.fs.stat(`${$.plugin.root}/.claude-plugin/plugin.json`, { resolve: true }).catch(() => undefined)
   if (running?.realPath === own.realPath) return
-  say($, `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`)
+  const installed = running?.realPath?.includes('/.claude/plugins/') === true
+  say($, installed
+    ? `Coherence: an installed copy of the mod (${$.plugin.root}) runs here in place of this tree's own mods/coherence, so edits to it are not loaded; \`node src/cli.ts hooks uninstall --host claude\` removes the copy installed for this repository, and \`claude plugin uninstall coherence@coherence --scope user\` one installed for you.`
+    : `Coherence: the mod running here is ${running?.realPath?.replace(/\/\.claude-plugin\/plugin\.json$/, '') ?? $.plugin.root}, not this tree's own mods/coherence; edits there reload it, edits here do not.`)
 }
 
 async function setUp($: Engine): Promise<void> {
