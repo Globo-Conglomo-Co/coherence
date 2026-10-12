@@ -20,7 +20,7 @@
 
 import { loadRuns, type RunRecord } from "../enforcement/record.ts";
 import { JournalError, onePositional, parseFlags, required } from "./args.ts";
-import { GLYPH, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
+import { GLYPH, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove, type WorkRecord } from "./record.ts";
 import { loadJournal } from "./store.ts";
 import { CITE, attribution, citations, head, vetted, withCommon, type Context, type Written } from "./verbs.ts";
 import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./work.ts";
@@ -28,6 +28,12 @@ import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./
 /** What a work verb prints on success; the first line starts with the record id. */
 export interface WorkWritten {
   lines: string[];
+}
+
+/** The one way a work record reaches its store: vetted first, so a record the vet stands against is refused before anything is written. */
+function writeWork(ctx: Context, record: WorkRecord): void {
+  vetted(ctx, record);
+  appendWork(ctx.cwd, record);
 }
 
 function orderOrRefuse(cwd: string, id: string, verb: string): WorkOrder {
@@ -49,8 +55,7 @@ function create(argv: string[], ctx: Context): WorkWritten {
   const boundary = required(parsed, "boundary", "an order names the folders or files its owner may write");
   const owner = parsed.one.get("owner-session") ?? who.session;
   const record: WorkOrderRecord = { ...head("order", who, ctx, objective), objective, success, boundary, owner, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return {
     lines: [
       `${record.id}  work order recorded in ${WORK_DIR}/${record.session}.jsonl; owner ${owner}; state open`,
@@ -73,8 +78,7 @@ function move(argv: string[], ctx: Context): WorkWritten {
   refuseTerminal(order, "move");
   if (order.state === state) throw new JournalError(`work move: ${id} is already ${state}`);
   const record: WorkMove = { ...head("move", who, ctx, `${id}\n${state}\n${because}`), of: id, state, because, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} ${order.state} -> ${state} recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
@@ -86,8 +90,7 @@ function close(argv: string[], ctx: Context): WorkWritten {
   const order = orderOrRefuse(ctx.cwd, id, "close");
   refuseTerminal(order, "close");
   const record: WorkCompletion = { ...head("completion", who, ctx, `${id}\n${because}`), of: id, state: "completed", because, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} ${order.state} -> completed recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
@@ -101,8 +104,7 @@ function owner(argv: string[], ctx: Context): WorkWritten {
   refuseTerminal(order, "owner");
   if (order.owner === next) throw new JournalError(`work owner: ${id} is already owned by ${next}`);
   const record: WorkOwner = { ...head("owner", who, ctx, `${id}\n${next}\n${because}`), of: id, owner: next, because };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} owner ${order.owner} -> ${next} recorded in ${WORK_DIR}/${record.session}.jsonl`] };
 }
 

@@ -16,9 +16,11 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   crossing: project-source -> record
   kinds: none
 - a record is vetted before it is written: A journal or work record whose own words use a name the lexicon rejects where it binds is refused before anything reaches the store, naming each name and what it was rejected for; a name a decision's over turns away is the record doing its job and passes.
+  protects: appendWork
+  chokepoint: writeWork
   over: a decision and a work order carrying a rejected name, and a decision naming the same name in its over, through the verb table and through the command line
   via: a record the vet stands against is refused before anything is written
-  because: the store is append-only, so a rejected name found after a write costs a retraction and a second record; one session paid that twice, for a word the lexicon had refused all along
+  because: the store is append-only, so a rejected name found after a write costs a retraction and a second record; one session paid that twice, for a word the lexicon had refused all along; a work record reaches its store only through writeWork, which vets first, as a journal record reaches it only through write
   crossing: project-source -> record
   kinds: none
 - append-only store: A journal file is only appended: a second write never changes the first line, and no path rewrites or deletes a record.
