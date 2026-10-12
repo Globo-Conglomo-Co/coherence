@@ -2,7 +2,7 @@
  * The work verbs: one command, five subcommands, each an appended record or a read.
  *
  *   work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>] [--cite <id>]...
- *   work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...
+ *   work move <id> <state> --because "<why>" [--cite <id>]...   (state: one of MOVE_STATES)
  *   work close <id> --because "<what was done>" [--cite <id>]...
  *   work owner <id> --owner-session <id> --because "<why>"
  *   work inspect [<id>]
@@ -20,7 +20,7 @@
 
 import { loadRuns, type RunRecord } from "../enforcement/record.ts";
 import { JournalError, onePositional, parseFlags, required } from "./args.ts";
-import { GLYPH, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
+import { GLYPH, MOVE_STATES, alternation, spoken, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
 import { loadJournal } from "./store.ts";
 import { CITE, attribution, citations, head, vetted, withCommon, type Context, type Written } from "./verbs.ts";
 import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./work.ts";
@@ -66,7 +66,7 @@ function move(argv: string[], ctx: Context): WorkWritten {
   const [id, state, ...rest] = parsed.positionals;
   if (id === undefined || state === undefined) throw new JournalError("work move takes <id> <state>");
   if (rest.length > 0) throw new JournalError(`work move: unexpected argument "${rest[0]}"`);
-  if (!isWorkState(state)) throw new JournalError(`work move: "${state}" is not open, active, waiting, or cancelled`);
+  if (!isWorkState(state)) throw new JournalError(`work move: "${state}" is not ${spoken(MOVE_STATES)}`);
   if (state === "completed") throw new JournalError(`work move: completed is what close records; run: work close ${id} --because "<what was done>"`);
   const because = required(parsed, "because", "a move records why the order moved");
   const order = orderOrRefuse(ctx.cwd, id, "move");
@@ -221,7 +221,7 @@ export function work(argv: string[], ctx: Context): Written | WorkWritten {
 export const WORK_USAGE = [
   "work orders (writes need --session <id> --agent <name>; binding to journal writes and runs is inferred from sole active ownership):",
   '  work create "<objective>" --success "<observable criterion>" --boundary "<folders or files the owner may write>" [--owner-session <id>] [--cite <id>]...',
-  '  work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...',
+  `  work move <id> <${alternation(MOVE_STATES)}> --because "<why>" [--cite <id>]...`,
   '  work close <id> --because "<what was done>" [--cite <id>]...',
   '  work owner <id> --owner-session <id> --because "<why>"',
   "  work inspect [<id>]",

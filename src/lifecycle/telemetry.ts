@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
+import { CAUGHT as JOURNAL_CAUGHT } from "../journal/record.ts";
 import { LANGUAGES } from "../adapters/index.ts";
 import { effectiveConfig, registryForLeaf } from "../adapters/project-config.ts";
 import { projectFiles } from "../adapters/project-files.ts";
@@ -46,7 +47,8 @@ export const PLATFORMS = ["darwin", "linux", "win32", "other"] as const;
 export const FILE_BUCKETS = ["<1k", "1k-10k", "10k-100k", ">100k"] as const;
 export const COMPONENT_BUCKETS = ["<10", "10-100", "100-1k", ">1k"] as const;
 export const INTRODUCED = ["fix", "pre-existing", "unknown"] as const;
-export const CAUGHT = ["review", "ci", "probe", "adopter", "self", "test", "unknown"] as const;
+/** What caught a defect, as the journal declares it, and unknown for a value it does not. */
+export const CAUGHT = [...JOURNAL_CAUGHT, "unknown"] as const;
 /** A defect class is a short slug, a name from the defect classes Coherence keeps, never prose; anything else is sent as "other". */
 const CLASS_FORM = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
