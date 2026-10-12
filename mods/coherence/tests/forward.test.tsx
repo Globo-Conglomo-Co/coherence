@@ -81,17 +81,19 @@ test("a stop's digest reaches the user under the answer, never the agent's conte
   const stopped = await $.classic.Stop({ stop_hook_active: false, cwd: '/p' })
   expect(stopped.additionalContext).toBe(undefined)
   const turn = await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 'u1', reason: 'answer' })
-  expect(turn.text).toBe(digest)
+  expect(turn.text).toBe('Regulate (Stop): Spec: 1 problem')
 })
 
-test("a message of several lines reaches the transcript a line at a time, none holding a newline", async ($, on) => {
+test("a message of several lines reaches the transcript as one line, and a subagent stop's digest the user just read is not said again", async ($, on) => {
   const message = 'Regulate (SubagentStop):\nSpec:\n  9 requirements open in the project; run: spec --check'
   const answer = { id: 1, stdout: JSON.stringify({ systemMessage: message }), stderr: '', exit: 0, ms: 3 }
   const seen = engine(on, { fetch: () => JSON.stringify(answer) }, '')
   await started($)
-  await $.classic.SubagentStop({ stop_hook_active: false, cwd: '/p', agent_id: 'a1', agent_type: 'general-purpose' })
-  const lines = seen.said.filter((line) => line.includes('Regulate') || line.includes('Spec:') || line.includes('requirements open'))
-  expect(lines).toEqual(['Regulate (SubagentStop):', 'Spec:', '  9 requirements open in the project; run: spec --check'])
+  const stop = { stop_hook_active: false, cwd: '/p', agent_id: 'a1', agent_type: 'general-purpose' }
+  await $.classic.SubagentStop(stop)
+  await $.classic.SubagentStop({ ...stop, agent_id: 'a2' })
+  const lines = seen.said.filter((line) => line.includes('Regulate'))
+  expect(lines).toEqual(['Regulate (SubagentStop): Spec: 9 requirements open in the project; run: spec --check'])
 })
 
 test('a refusal blocks the stop with its reason, as the settings hook exit 2 does', async ($, on) => {
