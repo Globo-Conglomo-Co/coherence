@@ -25,14 +25,13 @@ import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { configIgnore, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
+import { readerNaming } from "../lifecycle/host-tools.ts";
 import type { SpecModel } from "../spec/model.ts";
 import { predictClosure, type Instrument } from "./closure.ts";
 import { toRelative } from "./source.ts";
 
 export const TRACES_DIR = join(".coherence", "traces");
 
-/** Tools that read a file and name it the same way a writing tool does; the hook's set, kept here so the trace can be recorded without it. */
-export const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "NotebookRead", "read_file"]);
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -86,12 +85,12 @@ function append(root: string, line: TraceLine): string {
 
 /** The project-relative file a reading tool event read, or undefined when the event read no file under the root. */
 export function readFileOf(root: string, input: HookInput): string | undefined {
-  if (typeof input.tool_name !== "string" || !READING_TOOLS.has(input.tool_name)) return undefined;
+  // Which tools read, and the field each names its file in, is host-tools.ts's.
+  const field = readerNaming(input.tool_name);
   const toolInput = input.tool_input;
-  if (typeof toolInput !== "object" || toolInput === null) return undefined;
-  const record = toolInput as Record<string, unknown>;
-  const path = [record["file_path"], record["notebook_path"], record["path"]].find((v): v is string => typeof v === "string" && v !== "");
-  if (path === undefined) return undefined;
+  if (field === undefined || typeof toolInput !== "object" || toolInput === null) return undefined;
+  const path = (toolInput as Record<string, unknown>)[field];
+  if (typeof path !== "string" || path === "") return undefined;
   const rel = toRelative(root, path);
   if (rel === undefined || rel.startsWith(".git/") || rel.startsWith("node_modules/")) return undefined;
   try {
