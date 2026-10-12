@@ -33,7 +33,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { EARLIER_SEARCH, searchesCheckoutFirst } from "./version.ts";
+import { EARLIER_SEARCH, earlierMatcher, searchesCheckoutFirst } from "./version.ts";
+import { writersUnmatched } from "./host-tools.ts";
 import { RECORD_STORES } from "./project.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT } from "./state-files.ts";
 
@@ -287,6 +288,12 @@ function hookCommand(root: string, event: string): string {
   return commands[0]!;
 }
 
+/** The matcher of the PreToolUse entry of ours in .claude/settings.json. */
+function preToolUseMatcher(root: string): unknown {
+  const settings = JSON.parse(readFileSync(join(root, ".claude", "settings.json"), "utf8")) as { hooks?: Record<string, { matcher?: unknown; hooks: { command: string }[] }[]> };
+  return (settings.hooks?.["PreToolUse"] ?? []).find((entry) => entry.hooks.some((h) => /coherence/.test(h.command)))?.matcher;
+}
+
 interface HookCall {
   event: string;
   what: string;
@@ -535,11 +542,14 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     const after = "upgrade-after";
 
     // hooks --check passes as it stands, or, for hooks an earlier release wrote that look beside the project before the
-    // installed package, names that plainly, as the session start does, and passes once they are reinstalled.
+    // installed package or whose PreToolUse matcher leaves out a tool that writes, names that plainly, as the session
+    // start does, and passes once they are reinstalled.
     const check = coherence(root, "hooks", "--check", "--host", "claude");
     if (check.code !== 0) {
-      if (!searchesCheckoutFirst(hookCommand(root, "SessionStart"))) fail("hooks --check fails after the upgrade", check);
-      if (!check.stdout.includes(EARLIER_SEARCH)) fail("hooks --check fails over hooks an earlier release wrote without saying why", check);
+      const narrow = writersUnmatched(preToolUseMatcher(root));
+      if (!searchesCheckoutFirst(hookCommand(root, "SessionStart")) && narrow.length === 0) fail("hooks --check fails after the upgrade", check);
+      if (searchesCheckoutFirst(hookCommand(root, "SessionStart")) && !check.stdout.includes(EARLIER_SEARCH)) fail("hooks --check fails over hooks an earlier release wrote without saying why", check);
+      if (narrow.length > 0 && !check.stdout.includes(earlierMatcher(narrow))) fail(`hooks --check fails over a PreToolUse matcher that leaves out ${narrow.join(", ")} without saying so`, check);
       const start = sh("SessionStart under the earlier hooks", "sh", ["-c", hookCommand(root, "SessionStart")], root, JSON.stringify({ session_id: "upgrade-reinstall", cwd: root, hook_event_name: "SessionStart", source: "startup" }), { CLAUDE_PROJECT_DIR: root });
       if (!hookText(start.stdout).includes("Reinstall them: npx --no -- coherence hooks install --host claude")) fail("the session start under hooks an earlier release wrote does not name the reinstall", start);
       const reinstalled = coherence(root, "hooks", "install", "--host", "claude");

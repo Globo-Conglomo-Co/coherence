@@ -8,7 +8,8 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
-import { driftOf, EARLIER_SEARCH, earlierSearchLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
+import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -87,7 +88,7 @@ test("install --host claude merges into .claude/settings.json without clobbering
   assert.deepEqual(written.permissions, { allow: ["Bash(npm test)"] });
   assert.deepEqual(written.hooks["PreToolUse"], [
     { matcher: "Bash", hooks: [{ type: "command", command: "./lint" }] },
-    { matcher: "Bash|Edit|Write|MultiEdit|NotebookEdit", hooks: [{ type: "command", command: "npx coherence hook PreToolUse", timeout: 60 }] },
+    { matcher: CLAUDE_WRITER_MATCHER, hooks: [{ type: "command", command: "npx coherence hook PreToolUse", timeout: 60 }] },
   ], "another tool's PreToolUse stays, with Coherence's practice delivery beside it, matched to the tools that can fire a practice");
   assert.deepEqual(written.hooks["Stop"]!.map((e) => e.hooks[0]!.command), ["./other-tool stop", "npx coherence hook Stop"]);
   assert.equal(written.hooks["SubagentStop"]![0]!.hooks[0]!.timeout, 60);
@@ -601,21 +602,47 @@ test("hooks an earlier Coherence wrote, which look beside the project first, are
   try {
     assert.equal(searchesCheckoutFirst(`${EARLIER_LOCATE} hook Stop`), true);
     assert.equal(searchesCheckoutFirst(`${LOCATED_PREFIX} hook Stop`), false, "what install writes now looks at the installed package first");
-    assert.deepEqual(earlierSearchLines(project), [], "no settings, nothing to say");
+    assert.deepEqual(earlierHookLines(project), [], "no settings, nothing to say");
     await install({ root: project, host: "claude", command: LOCATED_PREFIX });
-    assert.deepEqual(earlierSearchLines(project), [], "current hooks, nothing to say");
+    assert.deepEqual(earlierHookLines(project), [], "current hooks, nothing to say");
     const path = join(project, ".claude", "settings.json");
     const settings = JSON.parse(await readFile(path, "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
     for (const [event, entries] of Object.entries(settings.hooks)) entries.at(-1)!.hooks[0]!.command = `${EARLIER_LOCATE} hook ${event}`;
     await writeFile(path, JSON.stringify(settings, null, 2) + "\n");
-    const lines = earlierSearchLines(project);
+    const lines = earlierHookLines(project);
     assert.equal(lines.length, 1, lines.join("\n"));
     assert.match(lines[0]!, /^Coherence hooks in \.claude\/settings\.json: written by an earlier Coherence, they look for a checkout beside the project \(\.\.\/coherence\) before the installed package/);
     assert.match(lines[0]!, /Reinstall them: npx --no -- coherence hooks install --host claude$/);
     const checked = formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) });
     assert.ok(checked.endsWith(`  these hooks were ${EARLIER_SEARCH}; reinstall them\nconverge with: hooks install --host claude\n`), checked);
     await install({ root: project, host: "claude", command: LOCATED_PREFIX });
-    assert.deepEqual(earlierSearchLines(project), [], "a reinstall clears it");
+    assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("a PreToolUse matcher that leaves out a tool that writes is named by the check and at the session start with the reinstall, and a wider one is not", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-matcher-"));
+  try {
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    const path = join(project, ".claude", "settings.json");
+    const settings = JSON.parse(await readFile(path, "utf8")) as { hooks: Record<string, { matcher?: string; hooks: { command: string }[] }[]> };
+    // The matcher 1.7.0 wrote, before the tools were declared in one place.
+    settings.hooks["PreToolUse"]!.at(-1)!.matcher = "Bash|Edit|Write|MultiEdit|NotebookEdit";
+    await writeFile(path, JSON.stringify(settings, null, 2) + "\n");
+    assert.deepEqual(earlierHookLines(project), ["Coherence hooks in .claude/settings.json: their PreToolUse matcher leaves out PowerShell, Monitor, which write files, so a practice they fire is not delivered before they run. Reinstall them: npx --no -- coherence hooks install --host claude"]);
+    const checked = formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) });
+    assert.match(checked, /PreToolUse: stale\n    entry field matcher: installed "Bash\|Edit\|Write\|MultiEdit\|NotebookEdit"; install would write "/);
+    assert.ok(checked.endsWith("  their PreToolUse matcher leaves out PowerShell, Monitor, which write files, so a practice they fire is not delivered before they run; reinstall them\nconverge with: hooks install --host claude\n"), checked);
+    // An adopter who widened the matcher runs the hook for every tool: the check still names the drift, the session start asks nothing of it.
+    settings.hooks["PreToolUse"]!.at(-1)!.matcher = ".*";
+    await writeFile(path, JSON.stringify(settings, null, 2) + "\n");
+    assert.deepEqual(earlierHookLines(project), [], "a wider matcher leaves out nothing");
+    assert.doesNotMatch(formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) }), /leaves out/);
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    assert.deepEqual(earlierHookLines(project), [], "a reinstall clears it");
+    assert.equal((JSON.parse(await readFile(path, "utf8")) as typeof settings).hooks["PreToolUse"]!.length, 1, "the reinstall replaces the entry of ours, never adds a second");
   } finally {
     await rm(project, { recursive: true, force: true });
   }

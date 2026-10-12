@@ -26,7 +26,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { configuredName, projectName } from "../../adapters/project-config.ts";
 import { stripTypeScriptTypes } from "node:module";
-import { dirname, extname, relative, resolve, sep } from "node:path";
+import { dirname, extname, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -45,32 +45,13 @@ import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The browser bundle, in dependency order. Each file may import the ones
- * before it; the relative imports are removed when the files are joined into
- * one inline module, and types are stripped by Node's own stripper.
+ * The page's one entry. The browser bundle is not a list kept by hand: it is
+ * every module the entry imports at run time, followed to the end and joined
+ * dependencies first (browserSources). A module the page calls into cannot be
+ * left out, and one the browser cannot run cannot be reached without failing
+ * the build.
  */
-export const BROWSER_SOURCES = [
-  "html.ts",
-  "model.ts",
-  "derive.ts",
-  "entrance-coverage.ts",
-  // The one source outside this folder: which entrances an invariant covers, shared with the spec model.
-  "../../spec/covers.ts",
-  "structure-flow.ts",
-  "lexicon-view.ts",
-  "components-view.ts",
-  "structure-measure.ts",
-  "structure-flow-view.ts",
-  "structure-view.ts",
-  "invariants-view.ts",
-  "practices.ts",
-  "practices-view.ts",
-  "runs-view.ts",
-  "journal-view.ts",
-  "shell.ts",
-  "updates.ts",
-  "page.ts",
-];
+export const BROWSER_ENTRY = "page.ts";
 
 export interface BuildOptions {
   /** The project root whose specs, runs, journal and work are read. The working directory when absent. */
@@ -332,10 +313,59 @@ async function browserSource(name: string): Promise<string> {
   return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
 }
 
-/** Drop a stripped source's imports of the other browser sources: this folder's, and the spec's covers.ts. Any other import stays, and the page check refuses it. */
+/**
+ * A stripped module's import and re-export statements, each with the module
+ * it names. Type stripping has already removed every type-only import, so
+ * what is left is exactly what the module needs at run time. An empty
+ * import list, all of whose names were types, is no edge.
+ */
+const MODULE_STATEMENT = /^(?:import|export)\s[^;]*?\sfrom\s+["']([^"']+)["'];[^\S\n]*$|^import\s+["']([^"']+)["'];[^\S\n]*$/gm;
+
+/** One import or re-export as the page may join it: a list of names under their own exported names, or a bare import for its effect. */
+const JOINABLE = /^(?:import\s*\{[^}]*\}\s*from|export\s*\{[^}]*\}\s*from|import\s+["'])/;
+
+function runtimeImports(stripped: string, name: string): string[] {
+  return [...stripped.matchAll(MODULE_STATEMENT)].flatMap((m) => {
+    const statement = m[0];
+    if (/^import\s*\{\s*\}\s*from/.test(statement)) return [];
+    // Joined into one module, a statement is removed and each name stands as its exporter declared it: a renamed, namespace
+    // or default import would leave its local name undefined in the browser, so it is refused here instead.
+    if (!JOINABLE.test(statement) || /\{[^}]*\sas\s[^}]*\}/.test(statement)) {
+      throw new Error(`Scope: ${name} has ${statement.replace(/\s+/g, " ")}; the page joins its modules into one name space, so a browser source imports names by their exported names, in braces, never renamed, as a namespace or as a default`);
+    }
+    return [(m[1] ?? m[2])!];
+  });
+}
+
+/**
+ * Every browser source, dependencies first: the entry and each module it
+ * imports at run time, followed to the end, as paths from this folder. An
+ * import the browser cannot resolve inside the bundle (a package, a node:
+ * module, anything but a relative path to another source) fails here, naming
+ * the importer, so a page that would break in the browser is never built.
+ */
+export async function browserSources(read: (name: string) => Promise<string> = browserSource): Promise<string[]> {
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const visit = async (name: string): Promise<void> => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    for (const target of runtimeImports(await read(name), name)) {
+      if (!target.startsWith("./") && !target.startsWith("../")) {
+        throw new Error(`Scope: ${name} imports ${target} at run time, and the page runs in a browser: a browser source imports only other sources by relative path, or types alone`);
+      }
+      await visit(posix.normalize(posix.join(posix.dirname(name), target)));
+    }
+    order.push(name);
+  };
+  await visit(BROWSER_ENTRY);
+  return order;
+}
+
+/** Drop a stripped source's import and re-export statements: browserSources has followed each into the bundle, so every one names a module joined beside it. */
 function toBrowserModule(stripped: string, name: string): string {
-  // A relative import may span several lines; `[^;]` crosses them.
-  return stripped.replace(/^import\s[^;]*from\s+["'](?:\.\/[^"']*|\.\.\/\.\.\/spec\/covers\.ts)["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
+  // A statement may span several lines; the pattern's `[^;]` crosses them.
+  return stripped.replace(MODULE_STATEMENT, "").concat(`\n// end of ${name}\n`);
 }
 
 /** The names a stripped module declares at its top level. */
@@ -351,7 +381,7 @@ function topLevelNames(module: string): string[] {
 async function browserScript(): Promise<string> {
   const parts: string[] = [];
   const declared = new Map<string, string>();
-  for (const name of BROWSER_SOURCES) {
+  for (const name of await browserSources()) {
     const module = toBrowserModule(await browserSource(name), name);
     for (const declaredName of topLevelNames(module)) {
       const earlier = declared.get(declaredName);

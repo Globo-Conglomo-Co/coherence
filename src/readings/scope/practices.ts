@@ -12,6 +12,7 @@
  * disagree with them. `query practice` reads the same story.
  */
 
+import { KINDS, WORK_KINDS } from "../../journal/kinds.ts";
 import { slug } from "./html.ts";
 import { citesOf, componentOfFile } from "./derive.ts";
 import type { JournalRecord, PracticeTrigger, ScopePractice, ShellState, SpecComponent } from "./model.ts";
@@ -141,23 +142,16 @@ export function practiceStory(state: Pick<ShellState, "practices" | "spec" | "jo
 
 /* -------------------------------------------------------------- origin */
 
-const KIND_OF_PREFIX: Record<string, string> = {
-  d: "decision",
-  df: "defect",
-  c: "conjecture",
-  u: "unable",
-  rt: "retraction",
-  rs: "resolution",
-  e: "escalation",
-  en: "enactment",
-  x: "experiment",
-  w: "work order",
-};
+/** Each record id prefix and the kind it marks, read off the minter's own tables, so a kind added there is named here. */
+const KIND_OF_PREFIX: ReadonlyMap<string, string> = new Map([
+  ...Object.entries(KINDS).map(([kind, prefix]) => [prefix, kind] as const),
+  ...Object.entries(WORK_KINDS).map(([kind, prefix]) => [prefix, `work ${kind}`] as const),
+]);
 
 /** What a citation names: a record's kind by its prefix, or a commit. */
 export function citationKind(id: string): string {
   const prefix = /^([a-z]+)-[0-9a-f]{8}$/.exec(id)?.[1];
-  return prefix === undefined ? "commit" : KIND_OF_PREFIX[prefix] ?? "record";
+  return prefix === undefined ? "commit" : KIND_OF_PREFIX.get(prefix) ?? "record";
 }
 
 export interface PracticeOrigin {
@@ -173,7 +167,7 @@ export function practiceOrigin(practice: ScopePractice, records: readonly Journa
   const cites = [...new Set([...practice.pitfalls.flatMap((pf) => pf.cites), ...practice.learned])];
   const kinds = new Map<string, number>();
   for (const id of cites) kinds.set(citationKind(id), (kinds.get(citationKind(id)) ?? 0) + 1);
-  const learnedFrom = [...kinds.entries()].map(([kind, n]) => count(n, kind, kind === "commit" ? "commits" : kind === "work order" ? "work orders" : `${kind}s`)).join(", ");
+  const learnedFrom = [...kinds.entries()].map(([kind, n]) => count(n, kind, `${kind}s`)).join(", ");
   const mine = enactmentsOf(records, practice.id);
   const ids = new Set(mine.map((e) => e.id));
   const amendments = records.filter((r): r is Extract<JournalRecord, { kind: "decision" }> => r.kind === "decision" && citesOf(r).some((id) => ids.has(id)));

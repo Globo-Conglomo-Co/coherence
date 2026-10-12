@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { commandMatches, firedBy, globMatches, parsePractices, type ToolUse } from "./practice.ts";
 import { loadSpecModel, projectPractices } from "./model.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
@@ -17,6 +17,7 @@ import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
+import { writersUnmatched } from "../lifecycle/host-tools.ts";
 import { practiceAnswer, practiceOrientText, toolUseOf } from "../lifecycle/practice-delivery.ts";
 import { scaffoldCommand } from "../scaffold/cli.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
@@ -173,6 +174,35 @@ test("every record a practice cites must exist, and every invariant it names mus
   assert.ok(messages.some((m) => /names invariant dial clicks, which its sister spec does not declare/.test(m)), messages.join("\n"));
 });
 
+describe("a cited commit is no commit only where git can tell", () => {
+  for (const { clone, cited, cites, problem } of [
+    { clone: "full", cited: "an older commit", cites: (old: string) => old, problem: false },
+    { clone: "full", cited: "a hash nothing has", cites: () => "0123abc", problem: true },
+    { clone: "shallow", cited: "an older commit its depth cut off", cites: (old: string) => old, problem: false },
+    { clone: "shallow", cited: "a file it holds", cites: (_old: string, blob: string) => blob, problem: true },
+  ] as const) {
+    test(`a ${clone} clone citing ${cited}: ${problem ? "a problem" : "no problem"}`, () => {
+      const origin = project({ "src/widget/Widget.spec.md": SPEC, "src/widget/knob.ts": "export const knob = 1;\n" });
+      const git = (cwd: string, ...args: string[]): string => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" }).trim();
+      git(origin, "add", "-A");
+      git(origin, "commit", "-q", "-m", "the knob seized");
+      const old = git(origin, "rev-parse", "--short", "HEAD");
+      const blob = git(origin, "rev-parse", "HEAD:src/widget/knob.ts");
+      writeFileSync(join(origin, "src/widget/Widget.practice.md"), practiceText(cites(old, blob)));
+      git(origin, "add", "-A");
+      git(origin, "commit", "-q", "-m", "oil the knob");
+      let root = origin;
+      if (clone === "shallow") {
+        root = mkdtempSync(join(tmpdir(), "coherence-practice-shallow-"));
+        projects.push(root);
+        git(tmpdir(), "clone", "-q", "--depth", "1", `file://${origin}`, root);
+      }
+      const messages = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
+      assert.equal(messages.some((m) => /which is no commit in this repository/.test(m)), problem, messages.join("\n"));
+    });
+  }
+});
+
 test("an enactment needs an outcome for every step, a because for a deviation or a skip, and keeps the text it enacted", () => {
   const { root, run } = widget();
   const missing = run("enact", "oil the knob", "--step", "1=done", ...WHO);
@@ -264,7 +294,7 @@ test("PreToolUse delivers a fired practice whole once per version per session, t
   const quiet = await fire("s2", "ls -la");
   assert.equal(quiet.stdout, "");
   assert.equal(quiet.exit, 0);
-  assert.deepEqual(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher, "Bash|Edit|Write|MultiEdit|NotebookEdit");
+  assert.deepEqual(writersUnmatched(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher), [], "Claude Code runs the hook for every tool that writes");
 });
 
 test("regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it", async () => {

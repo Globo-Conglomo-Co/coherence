@@ -187,6 +187,13 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
   checklist: declared-target-coverage dismissed: one session file, no fan-out
   checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
+- a shallow clone refuses only an introduced commit it can tell is none: In a shallow clone, defect --introduced with a commit the clone does not hold is written, because its depth may have cut the commit off; it is refused only when the hash names some other object the clone holds, or more than one; the same check, in commits.ts, answers a practice's cited commit.
+  over: a depth-1 clone given an older commit its depth cut off, and the hash of a file it holds
+  via: a shallow clone refuses only an --introduced git can tell is no commit
+  because: a hosted agent sandbox clones at depth 1, so a defect introduced by any older commit was refused as no commit, though the remote held it; the practice citation check had the same blind spot (review of PR #86), so both now ask git one way
+  crossing: project-source -> record
+  refuted: made missingCommits in commits.ts report nothing in a shallow clone, so a file's hash passed as a commit its depth cut off -> "a shallow clone refuses only an --introduced git can tell is no commit" went red in defects.test.ts on the file's hash; restored byte for byte, green batched and alone (2026-10-10)
+  kinds: none
 - a defect is classified by a later record, never edited: classify writes a decision citing the defect with the class, introduced and caught it gives, and every reader folds them oldest first: the defect's own fields, then each classification not retracted, then its close, a later field overriding an earlier one; a field no record gave stays absent and is read as unknown.
   over: a defect classified twice and once more by a retracted classification, a defect nobody classified, a classification with no field, and one of a record that is no defect
   via: classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown
@@ -231,4 +238,18 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   because: whether discoveries repay is a trend no single record shows; a reading that guessed an old record's origin or version would report the convergence it was built to measure rather than the one the records hold
   crossing: record -> reading
   refuted: made originOf read a defect with no introduced as fix-induced instead of unknown -> "query convergence counts arrivals by origin and catch, escapes per release, closes and repeats, bullets at each tag and hook latency per version, and says unknown wherever a record does not say" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- the record stores are named once: Each record store and its folder under .coherence is named once, in journal/stores.ts; every module that reads or writes a store takes its folder from there, and the folders a project commits, the union merge each store's files take, the stores Scope live follows, the stores the vocabulary check reads as words, and the CI records summary all derive from that table, so no module names a store's folder again.
+  over: every store in the table, against the .coherence ignore file's kept folders, the attributes lines, Scope live's store matching, the prose folders the check reads, and the records summary run on a repository holding a record in each store; and every source module and CI script, scanned for a store's folder written as a path, a pair of folders listed together, or an alternation of them
+  via: every record store is committed, merged by union, followed live, read for words when it holds prose, and summarized from the one table, and no module names a store's folder again
+  because: RECORD_STORES named journal, runs and work beside the folders each store module, Scope live and the records summary declared for themselves, so a store added or renamed and left out of it would never be committed, would get no union merge and no live refresh, and nothing would fail (df-7bbcdfc5)
+  crossing: project-source -> record
+  refuted: gave project.ts its own list of the record stores again, RECORD_STORES = ["journal", "runs", "work"] in place of the table's folders -> "every record store is committed, merged by union, followed live, read for words when it holds prose, and summarized from the one table, and no module names a store's folder again" went red in stores.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- a record field's role is declared once: Whether each field of each journal and work record is the writer's prose, a quoted refusal, or bookkeeping is declared once, in RECORD_ROLES beside the record types, keyed by each type's own fields so a field without a role fails to compile; the vocabulary check reads the prose and lexicon coverage the prose and the quoted, both through recordWords, and a field no type declares is read as prose.
+  over: a record of every kind in both stores holding a distinct string in every field its type declares, nested lists, maps and objects included, and one field no type declares, read by the check and by coverage; an enactment's outcomes and a close's verdicts
+  via: both readers of a record's words read every field by the role its record type declares, and a field no type declares as prose
+  because: the check and coverage each kept a set of bookkeeping field names, and the two disagreed on eleven of them while neither named cites, so the check never read an enactment step's evidence and coverage never read a defect's evidence (df-baa1d2fa); a set keyed by field name could not give a close's results and an enactment's results their two roles
+  crossing: record -> reading
+  refuted: gave lexicon coverage its own list of bookkeeping fields again, skipping evidence wherever it appears ahead of the role tables -> "both readers of a record's words read every field by the role its record type declares, and a field no type declares as prose" went red in record-roles.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-11)
   kinds: none

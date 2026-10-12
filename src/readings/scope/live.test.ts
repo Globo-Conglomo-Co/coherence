@@ -5,17 +5,21 @@
  */
 
 import assert from "node:assert/strict";
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
+import { closeWork, openWork } from "../../lifecycle/work-meter.ts";
+import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
 import { scopeState } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { scopeApp } from "./live.ts";
+import { scopeApp, storeOf, watchedLexicons } from "./live.ts";
 import type { JournalRecord, RunRecord, ShellState } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
@@ -260,5 +264,31 @@ test("the first load stays flat as the journal and the runs grow, every derived 
     }
   } finally {
     grown.remove();
+  }
+});
+
+test("every file the spec model reads by name refreshes the live reading: each spec and practice file it read for this repository, and the config", async () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const scope = openWork();
+  try {
+    loadSpecModel(root, { runs: false });
+  } finally {
+    closeWork(scope);
+  }
+  const named = scope.work.reads.filter((read) => read.startsWith("spec ") || read.startsWith("practice ")).map((read) => relative(root, read.slice(read.indexOf(" ") + 1)));
+  assert.ok(named.some((file) => file.endsWith(".practice.md")), "the model read a practice file");
+  for (const file of named) assert.equal(storeOf(file, []), "model", `${file} is read by the model, so a change to it refreshes the reading`);
+  assert.equal(storeOf(CONFIG_FILE, []), "model");
+  assert.equal(storeOf("src/widget/Widget.practice.md", []), "model", "a practice file not yet written refreshes the reading once it is");
+  assert.equal(storeOf("src/widget/widget.ts", []), undefined, "a source file is no file the model reads by name");
+  // The lexicons are located as the state's load locates them: a config that names one elsewhere is followed.
+  const project = mkdtempSync(join(tmpdir(), "coherence-live-lexicon-"));
+  try {
+    writeFileSync(join(project, CONFIG_FILE), JSON.stringify({ lexicon: "vocab/terms.json" }));
+    const lexicons = await watchedLexicons(project, { lexiconPath: COHERENCE_LEXICON });
+    assert.equal(storeOf("vocab/terms.json", lexicons), "model", "the lexicon the config names refreshes the reading");
+    assert.equal(storeOf("lexicon.json", lexicons), "model", "and one written later at the default name");
+  } finally {
+    rmSync(project, { recursive: true, force: true });
   }
 });

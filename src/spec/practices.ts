@@ -15,7 +15,6 @@
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
@@ -24,6 +23,7 @@ import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
 import { recordsOnOtherBranches } from "../journal/branches.ts";
+import { missingCommits } from "../journal/commits.ts";
 import type { Decision, Enactment, JournalRecord } from "../journal/record.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -107,18 +107,6 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
     }
   }
   return out;
-}
-
-/** The commits among the citations that this repository does not hold; undefined when git cannot be asked. */
-function missingCommits(root: string, commits: readonly string[]): Set<string> | undefined {
-  if (commits.length === 0) return new Set();
-  const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: commits.map((c) => `${c}^{commit}`).join("\n") + "\n", encoding: "utf8" });
-  if (result.status !== 0) return undefined;
-  const missing = new Set<string>();
-  result.stdout.split("\n").forEach((line, index) => {
-    if (/ missing$| ambiguous$/.test(line) && commits[index] !== undefined) missing.add(commits[index]!);
-  });
-  return missing;
 }
 
 export interface PracticeChecks {

@@ -13,6 +13,7 @@ import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
+import { STORE_FOLDERS } from "../journal/stores.ts";
 import { DEFAULT_PROJECT_LEXICON, configuredName, effectiveConfig, leafOf, projectName, registryOf, under, type Registry } from "../adapters/project-config.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -172,12 +173,13 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
 }
 
 /**
- * The record stores under .coherence: one append-only JSONL file per session,
- * whose readers order and fold records by their content, never by line. Two
- * branches append to the same session's file, so git merges each with the
- * union of both sides' lines (state-files.ts).
+ * The record stores' folders under .coherence: one append-only JSONL file per
+ * session, whose readers order and fold records by their content, never by
+ * line. Two branches append to the same session's file, so git merges each
+ * with the union of both sides' lines (state-files.ts). The stores are named
+ * once, in journal/stores.ts; this is that table's folders.
  */
-export const RECORD_STORES: readonly string[] = ["journal", "runs", "work"];
+export const RECORD_STORES: readonly string[] = STORE_FOLDERS;
 
 /** The folders under .coherence a project commits: the record stores, and the project's own hook voice. Everything else there is regenerated. */
 export const DURABLE_FOLDERS: readonly string[] = [...RECORD_STORES, "hooks"];

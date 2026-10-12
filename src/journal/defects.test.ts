@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { journalVerbs, type Io } from "./cli.ts";
 import { defectStates } from "./defects.ts";
 import { convergence, convergenceText } from "./convergence.ts";
@@ -124,6 +124,24 @@ test("a defect carries a declared class, where it came in and what caught it, an
   assert.match(j("journal", full).out.join("\n"), /class path-identity, introduced [0-9a-f]{7}, caught review/);
 });
 
+describe("a shallow clone refuses only an --introduced git can tell is no commit", () => {
+  for (const { introduced, refused } of [
+    { introduced: "an older commit its depth cut off", refused: false },
+    { introduced: "a file it holds", refused: true },
+  ] as const) {
+    test(`${introduced} is ${refused ? "refused" : "written"}`, () => {
+      const origin = project({ "knob.ts": "export const knob = 1;\n" });
+      const older = commitAll(origin, "first", "2026-10-01T10:00:00Z");
+      commitAll(origin, "second", "2026-10-02T10:00:00Z");
+      const blob = execFileSync("git", ["rev-parse", "HEAD:knob.ts"], { cwd: origin, encoding: "utf8" }).trim();
+      const root = made(mkdtempSync(join(tmpdir(), "coherence-defects-shallow-")));
+      execFileSync("git", ["clone", "-q", "--depth", "1", `file://${origin}`, root]);
+      const run = journal(root, clock("2026-10-03T00:00:00Z"))("defect", "the knob stuck", "--evidence", "turned it", "--introduced", refused ? blob : older, ...WHO);
+      assert.equal(run.code, refused ? 1 : 0, run.err.join("\n"));
+    });
+  }
+});
+
 test("classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown", () => {
   const root = project();
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
@@ -210,13 +228,13 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   execFileSync("git", ["tag", "v0.2.0"], { cwd: root });
   witness(root, "widget", "knob turns", "2026-10-02T12:00:00.000Z");
   const j = journal(root, clock("2026-10-03T00:00:00Z"));
-  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "silent-skip", "--introduced", feature.slice(0, 9), "--caught", "review", ...WHO));
+  const byCommit = idOf(j("defect", "the dial skipped", "--evidence", "e", "--class", "cost", "--introduced", feature.slice(0, 9), "--caught", "review", ...WHO));
   const byPull = idOf(j("defect", "the dial stuck", "--evidence", "e", "--introduced", "PR #7", "--caught", "test", ...WHO));
   idOf(j("defect", "the knob was always loose", "--evidence", "e", "--introduced", "pre-existing", "--caught", "adopter", ...WHO));
   const bare = idOf(j("defect", "something rattled", "--evidence", "e", ...WHO));
   idOf(j("resolved", byCommit, "--because", "fixed, every dial checked", "--guard", "widget/knob turns", ...WHO));
   idOf(j("resolved", bare, "--because", "tightened", ...WHO));
-  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "silent-skip", ...WHO));
+  const repeat = idOf(j("defect", "another dial skipped", "--evidence", "e", "--class", "cost", ...WHO));
   mkdirSync(join(root, ".coherence", "hook-times"), { recursive: true });
   writeFileSync(
     join(root, ".coherence", "hook-times", "s.jsonl"),
@@ -239,7 +257,7 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   assert.deepEqual(release.bullets && [release.bullets.bullets, release.bullets.enforced], [2, 2]);
   assert.deepEqual(c.releases.find((r) => r.tag === "v0.1.0")!.bullets!.bullets, 1);
   assert.deepEqual([c.closing.closed, c.closing.guarded, c.closing.neither], [2, 1, 1]);
-  assert.deepEqual(c.repeats, [{ class: "silent-skip", allTime: 1, inWindow: 1 }]);
+  assert.deepEqual(c.repeats, [{ class: "cost", allTime: 1, inWindow: 1 }]);
   assert.ok(c.repeats.length === 1 && repeat.startsWith("df-"));
   assert.deepEqual(
     c.hookLatency.map((h) => [h.event, h.version, h.count, h.p50, h.p95]),

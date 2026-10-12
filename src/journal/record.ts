@@ -8,24 +8,9 @@
  */
 
 import { createHash } from "node:crypto";
+import { KINDS, WORK_KINDS, type Kind, type WorkKind } from "./kinds.ts";
 
-/** Every kind the journal records, with the id prefix that marks it. */
-export const KINDS = {
-  decision: "d",
-  retraction: "rt",
-  conjecture: "c",
-  resolution: "rs",
-  dismissal: "dm",
-  defect: "df",
-  experiment: "x",
-  close: "xc",
-  unable: "u",
-  escalation: "e",
-  acknowledgement: "ak",
-  enactment: "en",
-} as const;
-
-export type Kind = keyof typeof KINDS;
+export { KINDS, WORK_KINDS, type Kind, type WorkKind };
 
 export const KIND_NAMES: readonly Kind[] = Object.keys(KINDS) as Kind[];
 
@@ -51,20 +36,6 @@ export const GLYPH: Record<Kind, string> = {
 
 /** The candidate every conjecture carries whether or not the caller named it. */
 export const INSTRUMENT_IS_WRONG = "the instrument is wrong";
-
-/**
- * The kinds the work store records, with their id prefixes. Work orders live
- * in their own files under .coherence/work; these kinds never appear in the
- * journal, but their ids come from the same minter.
- */
-export const WORK_KINDS = {
-  order: "w",
-  move: "wm",
-  owner: "wo",
-  completion: "wc",
-} as const;
-
-export type WorkKind = keyof typeof WORK_KINDS;
 
 export function isWorkKind(value: string): value is WorkKind {
   return Object.hasOwn(WORK_KINDS, value);
@@ -451,4 +422,106 @@ export function citedBy(records: readonly AnyRecord[]): Map<string, AnyRecord[]>
     }
   }
   return index;
+}
+
+/**
+ * What a record's field is to a reader of words. "prose" is the writer's own
+ * words: read for vocabulary (lexicon coverage) and for rejected names (the
+ * vocabulary check). "quoted" is prose that names what the writer turned away
+ * (a decision's over): read for vocabulary, never held against the writer.
+ * "meta" is bookkeeping, the tool's spelling and never words: ids, sessions,
+ * commits, paths, states and enumerated values.
+ */
+export type WordRole = "prose" | "quoted" | "meta";
+
+/** A field holding records of its own: one object read by its own table (fields), or a list or map of them (each). */
+export type NestedRoles = { readonly fields: RoleTable } | { readonly each: RoleTable };
+
+export interface RoleTable {
+  readonly [field: string]: WordRole | NestedRoles;
+}
+
+/** Every key of every member of a union, where keyof gives only the keys all members share. */
+type AnyKey<T> = T extends unknown ? keyof T : never;
+
+/**
+ * One role for every field a type can carry, optional ones included. Keyed by
+ * the type's own keys, so a field added to a record type without a role, or a
+ * role kept for a field the type no longer has, fails to compile.
+ */
+export type FieldRoles<T> = { readonly [K in AnyKey<T>]-?: WordRole | NestedRoles };
+
+const STAMP_ROLES = { id: "meta", kind: "meta", at: "meta", session: "meta", agent: "meta", commit: "meta", dirty: "meta" } as const satisfies FieldRoles<Stamp<string>>;
+const HEAD_ROLES = { ...STAMP_ROLES, work: "meta", binding: "meta" } as const satisfies FieldRoles<Head>;
+const CITING_ROLES = { cites: "meta" } as const satisfies FieldRoles<Citing>;
+const HUMAN_ROLES = { human: "prose" } as const satisfies FieldRoles<HumanWords>;
+/** A class is a name the lexicon declares, so it is read; where a defect came in and what caught it are a commit or a fixed word. */
+const ORIGIN_ROLES = { class: "prose", introduced: "meta", caught: "meta" } as const satisfies FieldRoles<DefectOrigin>;
+const STEP_ROLES = { id: "meta", text: "prose" } as const satisfies FieldRoles<Step>;
+const OUTCOME_ROLES = { result: "meta", evidence: "prose", because: "prose" } as const satisfies FieldRoles<StepOutcome>;
+
+/**
+ * The role of every field of every record kind, in both stores, declared once
+ * beside the types. The vocabulary check and lexicon coverage both read a
+ * record's words through recordWords, which reads these tables; neither keeps
+ * a list of field names of its own. Run records have no table: their store
+ * holds no prose (stores.ts), and nothing reads a run for words.
+ */
+export const RECORD_ROLES: { readonly [K in AnyRecord["kind"]]: FieldRoles<Extract<AnyRecord, { kind: K }>> } = {
+  decision: { ...HEAD_ROLES, ...CITING_ROLES, ...HUMAN_ROLES, classifies: { fields: { ...ORIGIN_ROLES, of: "meta" } satisfies FieldRoles<NonNullable<Decision["classifies"]>> }, chose: "prose", over: "quoted", because: "prose" },
+  retraction: { ...HEAD_ROLES, of: "meta", because: "prose" },
+  conjecture: { ...HEAD_ROLES, ...CITING_ROLES, observation: "prose", couldBe: "prose", discriminatedBy: "prose" },
+  resolution: { ...HEAD_ROLES, ...ORIGIN_ROLES, of: "meta", because: "prose", as: "prose", guard: "prose", decision: "meta" },
+  dismissal: { ...HEAD_ROLES, of: "meta", because: "prose" },
+  defect: { ...HEAD_ROLES, ...CITING_ROLES, ...ORIGIN_ROLES, what: "prose", evidence: "prose", files: "meta" },
+  experiment: { ...HEAD_ROLES, ...CITING_ROLES, expectation: "prose", context: "prose", actions: { each: STEP_ROLES }, criteria: { each: STEP_ROLES } },
+  close: { ...HEAD_ROLES, of: "meta", results: "meta", outcome: "meta" },
+  unable: { ...HEAD_ROLES, ...CITING_ROLES, what: "prose", because: "prose" },
+  escalation: { ...HEAD_ROLES, ...CITING_ROLES, ...HUMAN_ROLES, what: "prose", because: "prose" },
+  acknowledgement: { ...HEAD_ROLES, ...HUMAN_ROLES, of: "meta", because: "prose" },
+  enactment: {
+    ...HEAD_ROLES,
+    ...CITING_ROLES,
+    practice: "prose",
+    version: "meta",
+    trigger: "prose",
+    steps: { each: { text: "prose", leaves: "prose" } satisfies FieldRoles<Enactment["steps"][number]> },
+    pitfalls: "prose",
+    results: { each: OUTCOME_ROLES },
+  },
+  order: { ...STAMP_ROLES, ...CITING_ROLES, objective: "prose", success: "prose", boundary: "prose", owner: "meta" },
+  move: { ...STAMP_ROLES, ...CITING_ROLES, of: "meta", state: "meta", because: "prose" },
+  owner: { ...STAMP_ROLES, of: "meta", owner: "meta", because: "prose" },
+  completion: { ...STAMP_ROLES, ...CITING_ROLES, of: "meta", state: "meta", because: "prose" },
+};
+
+/**
+ * The strings of a parsed record a reader of words reads: every string under
+ * a field whose role `read` accepts, walked through nested lists and objects.
+ * A kind no table names, or a field its table does not, is read as prose
+ * apart from the head every record carries: a reader of words never skips
+ * what it does not know.
+ */
+export function recordWords(record: unknown, read: (role: WordRole) => boolean): string[] {
+  const out: string[] = [];
+  const kind = typeof record === "object" && record !== null ? (record as { kind?: unknown }).kind : undefined;
+  const table: RoleTable = typeof kind === "string" && Object.hasOwn(RECORD_ROLES, kind) ? RECORD_ROLES[kind as AnyRecord["kind"]] : HEAD_ROLES;
+  walkWords(record, table, read, out);
+  return out;
+}
+
+function walkWords(value: unknown, table: RoleTable | undefined, read: (role: WordRole) => boolean, out: string[]): void {
+  if (typeof value === "string") out.push(value);
+  else if (Array.isArray(value)) for (const item of value) walkWords(item, table, read, out);
+  else if (typeof value === "object" && value !== null) {
+    for (const [field, item] of Object.entries(value)) {
+      const role = table === undefined || !Object.hasOwn(table, field) ? "prose" : table[field]!;
+      if (typeof role === "string") {
+        if (read(role)) walkWords(item, undefined, read, out);
+      } else if ("fields" in role) walkWords(item, role.fields, read, out);
+      else if (Array.isArray(item)) for (const each of item) walkWords(each, role.each, read, out);
+      else if (typeof item === "object" && item !== null) for (const each of Object.values(item)) walkWords(each, role.each, read, out);
+      else walkWords(item, undefined, read, out);
+    }
+  }
 }

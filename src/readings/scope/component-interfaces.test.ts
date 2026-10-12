@@ -30,7 +30,7 @@ import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { keptLine } from "./kept-answers.ts";
+import { adapterCode, keptLine } from "./kept-answers.ts";
 import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
 import { checked, routedProject } from "./routed-fixture.ts";
@@ -441,4 +441,18 @@ test("kept answers are never used silently: when what the server's answers rest 
   } finally {
     remove();
   }
+});
+
+test("the kept answers rest on every module the language adapters reach: their entry and each module any of them imports, wherever it lives", () => {
+  const code = adapterCode();
+  const held = new Set(code);
+  const src = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  assert.ok(held.has(join(src, "adapters", "index.ts")), "the adapters' entry");
+  for (const file of code) {
+    for (const [, specifier] of readFileSync(file, "utf8").matchAll(/^(?:import|export)\s[^;]*?\sfrom\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
+      const target = resolve(dirname(file), specifier!);
+      assert.ok(held.has(target), `${file} imports ${specifier}, so a change to it may change an answer`);
+    }
+  }
+  for (const reached of ["adapters/installed.ts", "adapters/tach.ts", "adapters/toml.ts", "adapters/project-config.ts", "lifecycle/work-meter.ts"]) assert.ok(held.has(join(src, reached)), reached);
 });

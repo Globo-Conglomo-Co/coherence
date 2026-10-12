@@ -94,3 +94,32 @@ test("run --each runs each batched totality oracle's test in its own invocation 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too", { timeout: 120_000 }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-names-"));
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text, "utf8");
+  };
+  write("tests/leftovers.test.mjs", LEFTOVERS);
+  write("Fixture.spec.md", SPEC);
+  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "tests", test: "node --test --test-concurrency=1 --test-name-pattern={filter} tests/leftovers.test.mjs", testMatch: "# pass [1-9][0-9]*" }));
+  const context = process.env["NODE_TEST_CONTEXT"];
+  delete process.env["NODE_TEST_CONTEXT"];
+  try {
+    const out: string[] = [];
+    const err: string[] = [];
+    // One real name beside a misspelled one: before, the misspelled one was left out and the run passed on the other.
+    const refused = await runCommand(["--invariant", "loner", "--invariant", "lonre", "--session", "names-1", "--agent", "enforcement"], { cwd: root, out: (l) => out.push(l), err: (l) => err.push(l) });
+    assert.equal(refused, 64, `refused: ${out.join("\n")}`);
+    assert.match(err.join("\n"), /no bullet is named "lonre"/);
+    assert.deepEqual(loadRuns(root).records, [], "nothing ran, so no run was recorded");
+    const taken: string[] = [];
+    const byFolder = await runCommand(["--invariant", "./loner", "--session", "names-2", "--agent", "enforcement"], { cwd: root, out: (l) => taken.push(l), err: (l) => taken.push(l) });
+    assert.equal(byFolder, 0, taken.join("\n"));
+    assert.deepEqual(loadRuns(root).records.at(-1)!.invariants.map((e) => e.name), ["loner"], "the component folder and name select that bullet alone");
+  } finally {
+    if (context !== undefined) process.env["NODE_TEST_CONTEXT"] = context;
+    rmSync(root, { recursive: true, force: true });
+  }
+});

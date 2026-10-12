@@ -22,11 +22,11 @@
  * in a family is never a guard failure.
  */
 
-import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JournalError } from "./args.ts";
+import { missingCommits } from "./commits.ts";
 import { CAUGHT, type Caught, type Decision, type Defect, type DefectOrigin, type JournalRecord, type Resolution } from "./record.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -77,15 +77,6 @@ export function declaredFamilies(root: string): Set<string> {
   return new Set([...classesIn(COHERENCE_LEXICON, true), ...(project === undefined ? [] : classesIn(project, true))]);
 }
 
-/** Whether git holds a commit by this name; undefined when git cannot be asked. */
-function commitExists(root: string, sha: string): boolean | undefined {
-  const result = spawnSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, encoding: "utf8" });
-  if (result.error !== undefined) return undefined;
-  if (result.status === 0) return true;
-  const inside = spawnSync("git", ["rev-parse", "--git-dir"], { cwd: root, encoding: "utf8" });
-  return inside.status === 0 ? false : undefined;
-}
-
 /**
  * The --class, --introduced and --caught a verb was given, checked: a class
  * must be a declared kebab-case name, introduced a commit git holds, PR #<n>,
@@ -109,7 +100,7 @@ export function originFields(given: { class?: string | undefined; introduced?: s
     const value = given.introduced.trim();
     if (value === "pre-existing" || value === "unknown" || PULL.test(value)) out.introduced = value;
     else if (COMMIT.test(value)) {
-      if (commitExists(root, value) === false) throw new JournalError(`--introduced ${value}: no commit by that name in this repository`);
+      if (missingCommits(root, [value])?.has(value)) throw new JournalError(`--introduced ${value}: no commit by that name in this repository`);
       out.introduced = value;
     } else throw new JournalError(`--introduced "${given.introduced}" reads a commit, PR #<n>, pre-existing or unknown`);
   }

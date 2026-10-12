@@ -90,14 +90,14 @@ import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoher
 import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
-import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
-import { earlierSearchLines, OWN_CLI, versionBlock } from "./version.ts";
+import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
+import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
@@ -566,9 +566,6 @@ export function lexiconStopText(report: CheckReport | undefined, walls: readonly
   return { text: out.join("\n") + "\n", owed };
 }
 
-/** Tools that read a file and name it the same way a writing tool does. */
-const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "read_file", "list_files", "search"]);
-
 /**
  * The project-relative paths a tool event wrote under the root; none when it
  * wrote no file there. `host` is the folder the host runs in, which a tool's
@@ -585,29 +582,17 @@ export function writtenFiles(root: string, input: HookInput, host: string = root
 }
 
 /**
- * Every path a tool event writes, absolute: an edit tool's file and a patch's
- * files, a relative one resolved against `host`, the folder the host runs in;
- * and what a shell command writes, against the folder it runs in (the event's
- * cwd, else `host`). A reading tool writes nothing. Words only: nothing is
- * read or stat'd.
+ * Every path a tool event writes, absolute: a writing tool's named files and
+ * a patch's, a relative one resolved against `host`, the folder the host
+ * runs in; and what a shell command writes, against the folder it runs in
+ * (the event's cwd, else `host`). Which tools write, and how each names its
+ * files, is host-tools.ts's: a tool it does not declare writes nothing but
+ * what a command in its input writes. Words only: nothing is read or stat'd.
  */
 export function writtenPaths(input: HookInput, host: string): string[] {
-  if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
-  const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
-  const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
-  const isPatch = typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch";
-  if(isPatch) {
-    const patch=typeof input.tool_input === "string" ? input.tool_input : [record["patch"],record["input"],record["command"]].find((v):v is string=>typeof v === "string");
-    if(patch?.trimStart().startsWith("*** Begin Patch") && patch.trimEnd().endsWith("*** End Patch")) {
-      for(const match of patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)) paths.push(match[1]!.trim());
-    }
-  }
-  // A shell command writes files too (a heredoc, sed -i, tee, a redirect, cp): read them from its words, against the folder it runs in.
-  const shellPaths: string[] = [];
-  const command = isPatch ? undefined : shellCommandOf(record);
-  if(command !== undefined) shellPaths.push(...shellWrittenPaths(command));
+  const { named, shell } = writtenNames(input);
   const ran = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : host;
-  return [...new Set([...paths.map((path) => resolve(host, path)), ...shellPaths.map((path) => resolve(ran, path))])];
+  return [...new Set([...named.map((path) => resolve(host, path)), ...shell.map((path) => resolve(ran, path))])];
 }
 
 /** The written files that are the project's own: a nested checkout's or an ignored file is not this session's patch. */
@@ -796,7 +781,7 @@ export async function startContext(root: string, input: HookInput = {}, report?:
  */
 export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
   const settings = installedRoot(root, env) ?? root;
-  const earlier = earlierSearchLines(settings);
+  const earlier = earlierHookLines(settings);
   return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
 }
 
@@ -1139,8 +1124,6 @@ function markOriented(root: string, session: string): void {
   }
 }
 
-/** The tools whose event names the files it writes, so the files, not the cwd, say which project it is about. */
-const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 /**
  * The project an event belongs to, for a hook installed at `base`: a tool
@@ -1148,9 +1131,7 @@ const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "
  * event, a shell command among them, where its cwd is (hookProject).
  */
 function eventProject(event: HookEvent, input: HookInput, base: string, cwd: string): HookProject {
-  const tool = typeof input.tool_name === "string" ? input.tool_name : "";
-  const fileTool = FILE_TOOLS.has(tool) || tool.split(".").at(-1) === "apply_patch";
-  const subjects = (event === "PreToolUse" || event === "PostToolUse") && fileTool ? writtenPaths(input, base) : [];
+  const subjects = (event === "PreToolUse" || event === "PostToolUse") && namesWrittenFiles(input.tool_name) ? writtenPaths(input, base) : [];
   return hookProject(base, subjects, cwd);
 }
 
@@ -1392,7 +1373,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
         const workText = workStopText(root, input);
-        const reading=session && existsSync(baselinePath(root,session)) ? await keptReading(root, await loadProjectLexicons(root)) : undefined;
+        const reading=session && existsSync(baselinePath(root,session)) ? await currentReading(root, await loadProjectLexicons(root)) : undefined;
         const coverage=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : { text: "", named: [] };
         const coverageText=coverage.text;
         // The terms edits held reach the session in this line: once it is out (and no override took its place), no prompt names them again.

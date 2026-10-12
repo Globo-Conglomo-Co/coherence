@@ -39,10 +39,11 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
+import { closureOf } from "../../enforcement/code-fingerprint.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
 import type { KeptReport } from "./model.ts";
@@ -61,8 +62,18 @@ const KEPT_EXTENSIONS: Record<Language, readonly string[]> = {
 /** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
 const BASIS_FILE = /^(?:tsconfig(?:\.[\w-]+)*\.json|jsconfig\.json|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|pyproject\.toml|pyrightconfig\.json|setup\.cfg|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|coherence\.config\.json)$/;
 
-/** The adapter code an answer comes from: a change to it may change any answer. */
-const ADAPTER_SOURCES = ["adapter.ts", "index.ts", "jsonrpc.ts", "project-files.ts", "python.ts", "typescript.ts"];
+/** Where the language adapters are entered: every module it reaches is code an answer comes from. */
+const ADAPTER_ENTRY = "adapters/index.ts";
+
+/**
+ * The adapter code an answer comes from, a change to any of which may change
+ * any answer: every module the adapters' entry imports, followed to the end,
+ * as this installation holds them (the sources in a checkout, the compiled
+ * modules in the published package, which ships no sources).
+ */
+export function adapterCode(): string[] {
+  return closureOf([ADAPTER_ENTRY]);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
@@ -113,15 +124,23 @@ function basisOf(root: string, language: Language, files: readonly string[], ign
     // An unreadable package.json is one more basis value, never a reason to reuse answers it might have changed.
   }
   basis["Coherence's version"] = version;
-  basis["the language adapter's code"] = digest(
-    ADAPTER_SOURCES.map((file) => {
-      try {
-        return readFileSync(join(COHERENCE_ROOT, "src", "adapters", file), "utf8");
-      } catch {
-        return `${file}: unreadable`;
-      }
-    }).join("\u0000"),
-  );
+  const code = adapterCode();
+  // No module found is never an empty basis that holds: the key says so, and differs from any reading that found its code.
+  basis["the language adapter's code"] =
+    code.length === 0
+      ? `unread: no module found from ${ADAPTER_ENTRY}`
+      : digest(
+          code
+            .map((file) => {
+              const name = relative(COHERENCE_ROOT, file);
+              try {
+                return `${name}\u0000${readFileSync(file, "utf8")}`;
+              } catch {
+                return `${name}: unreadable`;
+              }
+            })
+            .join("\u0000"),
+        );
   for (const file of files) {
     if (!BASIS_FILE.test(basename(file))) continue;
     try {

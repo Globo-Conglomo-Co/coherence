@@ -600,7 +600,6 @@
         "escape": "A defect whose introduced points into a release's range and that was recorded after the release's tag: it shipped.",
         "convergence": "The reading of whether discoveries repay, over a window: defects arriving by origin and catch, escapes per release, the share closed with a guard, repeats per class, bullets over time, hotspot churn, and hook latency per Coherence version (query convergence).",
         "class path-identity": "One file or folder spelled two ways (through a symbolic link, against another base, from the repository top instead of the project root) compares as two.",
-        "class silent-skip": "A reading or walk leaves part of its population out and says nothing about it.",
         "class cost": "Work out of proportion to the answer: a hook or reading that reads far more than it needs, past the latency budget.",
         "class ownership": "One party's thing treated as another's: Coherence's lexicon, practice or decision demanded of or read as an adopter's, or the reverse.",
         "class structure-drift": "What a spec, the lexicon or a document says has drifted from what the code or the files do, and no check sees it.",
@@ -619,7 +618,9 @@
         "class missing-entry-point": "A way of reaching the tool that users expect is absent or answers wrongly: a conventional flag or verb (--version, --help) that is not recognized or is taken by the program in front of it.",
         "class false-alarm": "A check reports a problem on input that is valid, such as a config, spec or lexicon an adopter wrote correctly or an earlier release wrote for it, so it fails CI or refuses a stop for nothing; guarded by the upgrade fixture carrying what adopters write.",
         "class merge-collision": "Two branches' ordinary writes to a store Coherence commits conflict when the branches are merged or rebased, so people resolve by hand what git could have merged; guarded by the stack test that merges two branches' appends to every committed store.",
-        "family audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice. A family: too broad for one guard, so each defect closes with its own guard or a decision, and a later one is no guard failure."
+        "family audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice. A family: too broad for one guard, so each defect closes with its own guard or a decision, and a later one is no guard failure.",
+        "family hand-list": "A list kept by hand that must mirror something defined elsewhere (files, imports, events, tools, keys), so the two drift and nothing fails: a module, an event or a tool silently left out. A family: each list is removed by deriving it from what it mirrors, one guard per list.",
+        "family silent-skip": "A reading, walk or command leaves part of what it was given out and says nothing about it. A family: every reader and command can skip in its own way, so each defect closes with its own guard or a decision, and a later one is no guard failure."
       }
     },
     {

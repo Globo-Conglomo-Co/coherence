@@ -293,7 +293,12 @@ evidence.
 3. Write a pure render pair (tools and results) beside `lexicon-view.ts`,
    with card ids under a new prefix registered in `resolveHash`.
 4. List it in `VIEWS` in `shell.ts` and add its cases to `renderViewTools`
-   and `renderViewResults`; add the file to `BROWSER_SOURCES` in order.
+   and `renderViewResults`. There is no list of browser sources to add it
+   to: the bundle is every module `page.ts` imports at run time, followed to
+   the end, so importing the new view where it is used is what puts it in.
 5. Top-level names are one name space across the browser sources; the
-   builder refuses a duplicate by name.
+   builder refuses a duplicate by name. A browser source imports names in
+   braces under their exported names, by relative path; a renamed,
+   namespace or default import, or one of a package or a `node:` module,
+   fails the build, since the page could not resolve it.
 6. Add what it must show to `check.test.ts`.

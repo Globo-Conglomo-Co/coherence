@@ -27,6 +27,8 @@ import { lexiconCoverage } from "./lexicon-coverage.ts";
 import { loadLexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON } from "./project.ts";
 import { cacheDir } from "./kept-parse.ts";
+import { currentReading, treeKeys } from "./vocabulary-state.ts";
+import { loadProjectLexicons } from "./project.ts";
 import { pendingCandidates } from "./lexicon-cli.ts";
 import { appendRun, entryKey, latestByEnforcement, loadRuns, parseLine, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing, RunIndexUnavailable } from "../enforcement/run-index.ts";
@@ -704,6 +706,34 @@ test("the peer feed shows every record a peer appended, through a cleared cache 
 
 /* ------------------------------------------------------------ the kept vocabulary */
 
+test("Stop reuses a complete vocabulary reading until a project file or record changes", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    const unchanged = await workOf(project, "Stop", {});
+    assert.equal(unchanged.work.counts["coverage reading"] ?? 0, 0);
+    assert.deepEqual(unchanged.work.reads.filter((r) => r.startsWith("corpus ")), []);
+
+    const file = join(project.root, "docs/note-0.md");
+    writeFileSync(file, readFileSync(file, "utf8") + "The `newterm` is here.\n");
+    const changed = await workOf(project, "Stop", {});
+    assert.equal(changed.work.counts["coverage reading"], 1);
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"] ?? 0, 0);
+
+    appendRecord(project.root, decision("d-00000009", "2026-03-05T00:00:00.000Z", "peer"));
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    writeFileSync(join(cacheDir(project.root), "vocabulary", "reading.json"), "{");
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    const snapshot = join(cacheDir(project.root), "vocabulary", "reading.json");
+    const saved = JSON.parse(readFileSync(snapshot, "utf8")) as Record<string, unknown>;
+    writeFileSync(snapshot, JSON.stringify({ ...saved, coverage: { version: 1, terms: [null] } }));
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
+
 test("an edit over torn or missing vocabulary buckets reads in full, says so, names nothing false and writes nothing derived from them", async () => {
   for (const damage of ["torn term buckets", "a missing file bucket", "a term bucket in another shape"] as const) {
     const project = sizedProject(1);
@@ -759,6 +789,38 @@ function fixtureGit(project: SizedProject, ...args: string[]): void {
   const done = spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: project.top, encoding: "utf8" });
   assert.equal(done.status, 0, `git ${args.join(" ")}: ${done.stderr}`);
 }
+
+test("the vocabulary tree key follows sparse checkout file membership", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    const layers = await loadProjectLexicons(project.root);
+    const read = async (): Promise<number> => {
+      const scope = openWork();
+      await currentReading(project.root, layers);
+      return closeWork(scope).counts["coverage reading"] ?? 0;
+    };
+    const full = treeKeys(project.root);
+    assert.ok(full !== undefined);
+    fixtureGit(project, "sparse-checkout", "set", "proj/docs");
+    const docs = treeKeys(project.root);
+    assert.notDeepEqual(docs, full);
+    assert.equal(await read(), 1);
+    assert.equal(await read(), 0);
+    fixtureGit(project, "sparse-checkout", "set", "proj/src");
+    const source = treeKeys(project.root);
+    assert.notDeepEqual(source, docs);
+    assert.equal(await read(), 1);
+    fixtureGit(project, "sparse-checkout", "disable");
+    const disabled = treeKeys(project.root);
+    assert.notDeepEqual(disabled, source);
+    assert.deepEqual(disabled, full);
+    assert.equal(await read(), 1);
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
 
 /** Three ways HEAD moves onto a clean tree, each set up before the session starts and made after it. */
 const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProject) => void][] = [
@@ -870,5 +932,3 @@ test("a work scope opened inside another adds its counts to the outer one", () =
   assert.equal(outerWork.counts.spawn, 4, "the outer scope holds its own work and the inner's");
   assert.equal(outerWork.counts["file read"], 1);
 });
-
-

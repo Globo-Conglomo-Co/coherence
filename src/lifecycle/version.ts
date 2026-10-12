@@ -24,7 +24,8 @@ import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
 import { installedPackage, projectFrom } from "../adapters/installed.ts";
-import { searchesCheckoutFirst } from "./hook-command.ts";
+import { isOwnHook, searchesCheckoutFirst } from "./hook-command.ts";
+import { WRITERS, writersUnmatched } from "./host-tools.ts";
 import { HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, type Host } from "./project.ts";
 import { coherenceVersion, readJson, telemetryDir, truthy, writeJson, type Env } from "./telemetry.ts";
 
@@ -221,9 +222,49 @@ export function earlierSearchHooks(dir: string): { host: Host; file: string; loc
   return out;
 }
 
-/** The session start's line for each settings file at `dir` whose hooks still search in the earlier order; empty when none does. */
-export function earlierSearchLines(dir: string): string[] {
-  return earlierSearchHooks(dir).map(({ host, file, local }) => `Coherence hooks in ${file}: ${EARLIER_SEARCH}. Reinstall them: npx --no -- coherence hooks install --host ${host}${local ? " --local" : ""}`);
+/**
+ * Why a Claude Code PreToolUse matcher of ours must be reinstalled: the tools
+ * that write files it leaves out, which an earlier Coherence did not know of
+ * or a hand narrowed. No apostrophes and no path: it is shown as written.
+ */
+export function earlierMatcher(missing: readonly string[]): string {
+  const one = missing.length === 1;
+  return `their PreToolUse matcher leaves out ${missing.join(", ")}, which write${one ? "s" : ""} files, so a practice ${one ? "it fires" : "they fire"} is not delivered before ${one ? "it runs" : "they run"}`;
+}
+
+/**
+ * The Claude Code settings files at `dir` whose PreToolUse entries of ours
+ * leave out a tool that writes files, with those tools. A matcher wider than
+ * the one install writes leaves out nothing and is never named.
+ */
+export function narrowMatcherHooks(dir: string): { file: string; local: boolean; missing: string[] }[] {
+  const out: { file: string; local: boolean; missing: string[] }[] = [];
+  for (const local of [false, true]) {
+    const file = local ? LOCAL_SETTINGS_FILE.claude : SETTINGS_FILE.claude;
+    if (file === undefined) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(join(dir, file), "utf8"));
+    } catch {
+      continue;
+    }
+    const hooks = isRecord(parsed) && isRecord(parsed["hooks"]) ? parsed["hooks"] : {};
+    const entries = Array.isArray(hooks["PreToolUse"]) ? (hooks["PreToolUse"] as unknown[]) : [];
+    const ours = entries.filter(isRecord).filter((entry) => Array.isArray(entry["hooks"]) && entry["hooks"].some((h) => isRecord(h) && isOwnHook(h["command"], "PreToolUse")));
+    // A tool is covered when any entry of ours runs for it.
+    const missing = ours.length === 0 ? [] : Object.keys(WRITERS.claude).filter((tool) => ours.every((entry) => writersUnmatched(entry["matcher"]).includes(tool)));
+    if (missing.length > 0) out.push({ file, local, missing });
+  }
+  return out;
+}
+
+/** The session start's line for each settings file at `dir` whose hooks an earlier Coherence wrote must be reinstalled: they search in the earlier order, or their matcher leaves out a tool that writes; empty when none must. */
+export function earlierHookLines(dir: string): string[] {
+  const reinstall = (host: Host, local: boolean): string => `Reinstall them: npx --no -- coherence hooks install --host ${host}${local ? " --local" : ""}`;
+  return [
+    ...earlierSearchHooks(dir).map(({ host, file, local }) => `Coherence hooks in ${file}: ${EARLIER_SEARCH}. ${reinstall(host, local)}`),
+    ...narrowMatcherHooks(dir).map(({ file, local, missing }) => `Coherence hooks in ${file}: ${earlierMatcher(missing)}. ${reinstall("claude", local)}`),
+  ];
 }
 
 // ---------------------------------------------------------------- the newest published version
