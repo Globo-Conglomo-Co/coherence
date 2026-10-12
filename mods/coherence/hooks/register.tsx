@@ -378,10 +378,12 @@ export const register: Register = on => {
   // One button in the band above the prompt, for the person: it opens Scope as /scope does, and yields to a survey.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Button } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    // A row of its own, set off from the transcript above: the tool's name dim at the left, the button drawn as one at the right.
     return (
-      <Box>
-        <Button key="scope" label="Scope ↗" plain dimColor onPress={() => void openScope($)} />
+      <Box marginTop={1} justifyContent="space-between">
+        <Text dimColor>coherence</Text>
+        <Button key="scope" label="Scope ↗" variant="primary" onPress={() => void openScope($)} />
       </Box>
     )
   })
