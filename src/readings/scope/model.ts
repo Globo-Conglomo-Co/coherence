@@ -356,6 +356,7 @@ export interface RunsData {
 /* The journal, as src/journal records it. */
 
 import type { Kind } from "../../journal/kinds.ts";
+import type { Outcome, StepResult } from "../../journal/record.ts";
 
 /** The journal's kinds, as its minter's table names them: a kind added there is one every Record<JournalKind, …> here must name. */
 export type JournalKind = Kind;
@@ -388,7 +389,7 @@ export type JournalRecord =
   | (JournalHead & { kind: "dismissal"; of: string; because: string })
   | (JournalHead & { kind: "defect"; what: string; evidence: string; files: string[] })
   | (JournalHead & { kind: "experiment"; expectation: string; context: string[]; actions: JournalStep[]; criteria: JournalStep[] })
-  | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
+  | (JournalHead & { kind: "close"; of: string; results: Record<string, StepResult>; outcome: Outcome })
   | (JournalHead & { kind: "unable"; what: string; because: string })
   | (JournalHead & { kind: "escalation"; what: string; because: string })
   | (JournalHead & { kind: "acknowledgement"; of: string; because: string })
