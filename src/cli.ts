@@ -60,7 +60,7 @@ import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
 import { keepAttributes, keepIgnore } from "./lifecycle/state-files.ts";
-import { installMod, modInstalled, uninstallMod, MOD_ID, MOD_REPOSITORY, type ModStep } from "./lifecycle/mod-install.ts";
+import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
@@ -310,6 +310,14 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
+      if (host === "claude" && !local && (await isCoherenceItself(place.dir))) {
+        // Coherence's own repository runs the tree's own mod from its skills folder, in place of hooks and of an installed copy.
+        const linked = ownModLinked(place.dir);
+        const shadowed = modInstalled(place.dir) || modInstalled(place.dir, "project");
+        process.stdout.write(!linked ? `claude: ${OWN_MOD_LINK} does not link this tree's mods/coherence, so no mod runs here\n` : shadowed ? `claude: ${MOD_ID} is installed for this repository and takes the name before ${OWN_MOD_LINK}, so the installed copy runs instead of this tree's mod; hooks uninstall --host claude removes it\n` : `claude: this tree's own mod runs from ${OWN_MOD_LINK} and reloads when a file of it is saved\n`);
+        drifted ||= !linked || shadowed;
+        continue;
+      }
       if (host === "claude" && modInstalled(place.dir, local ? "local" : "project")) {
         // The mod answers every event in place of the settings hooks at this scope.
         process.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
@@ -328,6 +336,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
     return drifted ? 1 : 0;
   }
   if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
+  if (flags.get("mod") === true && (await isCoherenceItself(root))) fail(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead\n${USAGE}`);
   if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(root, host, shared, given !== undefined || local) : modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);

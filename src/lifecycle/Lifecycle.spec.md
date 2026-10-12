@@ -1234,6 +1234,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: hooks install --mod --shared enables the mod in the committed settings in place of the committed Claude Code hooks, keeps the other host's, and uninstall takes it out
   because: a team that wants every member on the warm path, Coherence's own repository first, would otherwise hand-edit the committed settings, and the check would then call the missing hooks drift; the mod stands aside for every event a settings hook of Coherence's covers, so committed hooks left beside it would hold it back for everyone
   kinds: none
+- Coherence's own repository runs its own mod: In Claude Code, Coherence's own repository runs each tree's own mods/coherence, linked from the project's skills folder, so the main checkout and every worktree run their own mod and Claude Code reloads it when a file of it is saved; its committed settings carry no Coherence hook and no installed copy, hooks --check says which mod runs and names an installed copy that would take the mod's name first, and hooks install --mod is refused there.
+  over: the repository's own checkout: its skills-folder link, its committed settings, the check, and an install of the mod
+  via: Coherence's own repository runs each tree's own mod from its skills folder, never an installed copy, and Codex through its start hooks
+  because: developing the mod needs the tree's own code reloaded on save, which a copy installed from the marketplace never is; Claude Code loads a plugin from the project's skills folder and watches it, but refuses it when an installed plugin already has the name (seen on 2.1.295), so a copy installed for this repository would silently run in its place
+  kinds: none
 - the mod keeps Coherence's own files: While Coherence's mod is enabled, uninstalling the last settings hook of Coherence's keeps .coherence/.gitignore and .coherence/.gitattributes, because a host still runs Coherence.
   over: a project whose committed hooks are removed while its personal settings enable the mod
   via: while the mod is the only thing running Coherence, removing the last settings hook keeps .coherence's own files
