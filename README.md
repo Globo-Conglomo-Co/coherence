@@ -520,15 +520,15 @@ A project names its own lexicon under `lexicon` in `coherence.config.json`
 the concept's retired name is refused with the one-line `git mv` that migrates
 it; the old name is never read. SessionStart and SubagentStart inject
 both layers with a short instruction, the journal read command, and a decision
-write template. In Claude Code this checkout runs Coherence through its mod
-(`hooks install --host claude --mod --shared` wrote it into
-`.claude/settings.json`): Claude Code asks you once to install the
-`coherence` marketplace and the mod, and from then on every session here,
-in the main checkout and in each worktree, answers its events through one
-warm process running that tree's own `src/cli.ts`. The mod's own code comes
-from Claude Code's copy of the repository's main branch; to try changes to
-`mods/coherence` itself, start a session with `claude --plugin-dir
-mods/coherence`. Codex keeps its settings hooks in `.codex/hooks.json`.
+write template. In Claude Code this checkout runs Coherence through its mod,
+linked from `.claude/skills/coherence` to the tree's own `mods/coherence`:
+every session here, in the main checkout and in each worktree, loads that
+tree's mod and answers its events through one warm process running that
+tree's `src/cli.ts`, and an interactive session reloads the mod when a file
+of it is saved. A copy of the mod installed for this repository or for you
+(`hooks install --mod`, `/plugin install`) would take its name first and run
+instead; the mod says so when it starts, and `hooks --check --host claude`
+names one installed for this repository. Codex keeps its settings hooks in `.codex/hooks.json`.
 `node src/cli.ts hooks status` reports their installation and what each event
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
