@@ -662,10 +662,16 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
   const agent = agentOf(input);
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
+  if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.
   const unchecked = outcome.details.filter((d) => d.entry.verdict === "not run" && !/\bis prose\b/.test(d.entry.reason));
+  options.onEditCheck?.({
+    checked: outcome.details.filter((d) => d.entry.verdict === "pass" || d.entry.verdict === "fail").length,
+    failed: failed.map((d) => ({ invariant: `${d.entry.component}/${d.entry.name}`, ...(d.entry.bypasses[0] === undefined ? {} : { bypass: `${d.entry.bypasses[0].file}:${d.entry.bypasses[0].line} in ${d.entry.bypasses[0].symbol}` }) })),
+    unchecked: unchecked.length,
+  });
   const uncheckedText = unchecked.length === 0 ? "" : `Coherence could not check ${unchecked.length} chokepoint invariant${unchecked.length === 1 ? "" : "s"} at this edit:\n${unchecked.map((d) => `  ○ ${d.entry.component}/${d.entry.name}: ${d.entry.reason}`).join("\n")}\n`;
   if (failed.length === 0) return uncheckedText;
   const cli = await cliName(root);
@@ -913,6 +919,21 @@ export interface HookOptions {
    * line passes MIRROR_REFRESH; absent (a test), nothing is started.
    */
   mirrors?: ((root: string) => void) | undefined;
+  /**
+   * Told the verdict of an edit's chokepoint check as data, besides the text
+   * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
+   * that marks the tool call's row for the user. Absent (the command line), nothing is told.
+   */
+  onEditCheck?: ((verdict: EditVerdict) => void) | undefined;
+}
+
+/** An edit's chokepoint check as data: how many invariants it checked, which failed (with their first bypass), and how many it could not check. */
+export interface EditVerdict {
+  checked: number;
+  failed: { invariant: string; bypass?: string }[];
+  unchecked: number;
+  /** Why the instrument could not check at all, when it could not. */
+  reason?: string;
 }
 
 /**
