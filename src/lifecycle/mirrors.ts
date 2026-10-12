@@ -26,6 +26,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { readProjectText } from "./work-meter.ts";
+import { escapeRegExp } from "../enforcement/totality.ts";
 import { mirrorRecipeText, type MirrorRecipe } from "../spec/grammar.ts";
 import { declaredMirrors, SPEC_SUFFIX, type ModelMirror } from "../spec/model.ts";
 
@@ -190,8 +191,7 @@ function objectKey(segment: string): string | undefined {
  * name is set to one.
  */
 export function literalOf(text: string, name: string): Literal | undefined {
-  const escaped = name.replace(/\$/g, "\\$");
-  const declaration = new RegExp(`^(?:export\\s+)?(?:declare\\s+)?(?:const|let|var)\\s+${escaped}\\b`, "m").exec(text);
+  const declaration = new RegExp(`^(?:export\\s+)?(?:declare\\s+)?(?:const|let|var)\\s+${escapeRegExp(name)}\\b`, "m").exec(text);
   if (declaration === null) return undefined;
   const line = text.slice(0, declaration.index).split("\n").length;
   // The = that sets it: past a type annotation (whose braces may hold a ;), never an arrow or a comparison.

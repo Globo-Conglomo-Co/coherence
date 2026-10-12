@@ -159,3 +159,9 @@ test("a literal is read without the compiler: an array's strings, a tuple by its
     ["./a.ts", "./side.ts", "./v.ts", "./x.ts", "./z.ts"],
   );
 });
+
+test("a declared name is matched as itself, every regular-expression character in it taken literally", () => {
+  const text = "export const AxB = [\"a\", \"b\"];\nexport const A$B = [\"c\"];\n";
+  assert.equal(literalOf(text, "A.B"), undefined, "a dot in a name never matches another character");
+  assert.deepEqual(literalOf(text, "A$B")?.members, ["c"], "a dollar sign is the name's own");
+});
