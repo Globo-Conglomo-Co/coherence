@@ -92,6 +92,8 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
   }
   // The economy question reads the instrument and git, never the page state, and takes its own flags (--changed, --since).
   if (argv[0] === "economy") return queryEconomyCommand(argv.slice(1), io, deps.economy);
+  // The mirrors question reads git objects at a revision, never the page state; loaded on demand, so no other question loads the reading.
+  if (argv[0] === "mirrors") return (await import("../mirrors/cli.ts")).mirrorsCommand(resolve(io.cwd), argv.slice(1), io);
   // The convergence question reads the journal, the spec model, the history and the hook times, never the page state.
   if (argv[0] === "convergence") return convergenceCommand(resolve(io.cwd), argv.slice(1), io);
   let parsed: Parsed;

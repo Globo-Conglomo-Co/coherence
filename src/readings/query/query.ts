@@ -39,6 +39,7 @@ import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { BUDGET_FLAGS } from "../scope/component-interfaces.ts";
 import { lexiconReviewCommand } from "../scope/model.ts";
+import { MIRRORS_USAGE } from "../mirrors/policy.ts";
 import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
 export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "lexicon", "observed"] as const;
@@ -59,6 +60,7 @@ export const QUERY_USAGE = [
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
   "  query economy <path...> | --changed [--since <commit>]   what must be loaded to change these files safely: the economy prediction, through the instrument; --changed reads the working change from git (staged, unstaged, untracked), --since widens it from the merge base of <commit> and HEAD (--since main: this branch's whole change set)",
   "  query practice [<practice>]     every practice with its trigger, state and enactments; with one named, the whole practice as the hook delivers it",
+  MIRRORS_USAGE,
   "  query convergence [--days <n>] [--json]   whether discoveries repay: defects arriving by origin and catch, escapes per release, closes with a guard, repeats per class, bullets over time, churn, hook latency per version",
   "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");

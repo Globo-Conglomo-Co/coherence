@@ -76,6 +76,20 @@ per release, the share closed with a guard, repeats per class, bullets at each
 day and release tag, the files most often changed, and hook latency p50 and
 p95 per event and Coherence version.
 
+`query mirrors [--all] [--rev <rev>] [--json | --proposals]` is the mirror
+reading: the lists kept by hand that must mirror another list, a folder or the
+import closure of a list of files (the hand-list family), read from git
+objects at one revision, with history naming the commit that grew one side
+alone. It is advisory and never a spec problem. By default it lists only the
+groups that span files, share three or more names and score 20 or more; a
+list of files drifted from the import closure of its own files, with the
+commit named, is listed first wherever it ranks. `--proposals` prints the
+pairs it proposes for declaration, each as the list's file, line and name and
+one universe recipe: `closure of files`, `keys of <file>:<name>` or
+`literal at <file>:<line>`. No hook takes the reading: the session start and
+the stop start one in the background, and orient names the last one kept,
+labeled with its commit.
+
 ## Work orders
 
 A work order is content, not permission: objective, observable success
