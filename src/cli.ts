@@ -339,7 +339,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
 
 /** Each `claude plugin` step, one line each, with what Claude Code said. */
 function modSteps(steps: readonly ModStep[]): string {
-  return steps.map((s) => `claude plugin ${s.args.filter((a) => a !== "--json").join(" ")}: ${s.ok ? "" : "failed: "}${s.said}\n`).join("");
+  return steps.map((s) => `${s.args[0] === "plugin" ? "claude " : ""}${s.args.filter((a) => a !== "--json").join(" ")}: ${s.ok ? "" : "failed: "}${s.said}\n`).join("");
 }
 
 /**

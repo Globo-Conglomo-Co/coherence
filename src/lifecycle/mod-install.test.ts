@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -14,7 +14,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { WRITERS } from "./host-tools.ts";
 import { IGNORE_FILE } from "./install.ts";
-import { installMod, MARKETPLACE_FILE, MOD_FOLDER, MOD_ID, MOD_REPOSITORY, modInstalled, type ClaudeRunner } from "./mod-install.ts";
+import { installMod, localSettingsPath, MARKETPLACE_FILE, MOD_FOLDER, MOD_ID, MOD_REPOSITORY, modInstalled, type ClaudeRunner } from "./mod-install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 const OWN_PACKAGE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -96,6 +96,15 @@ test("hooks install --mod installs the mod at the personal scope from Coherence'
     const after = JSON.parse(await readFile(join(project, ".claude", "settings.local.json"), "utf8")) as { extraKnownMarketplaces?: Record<string, unknown> };
     assert.deepEqual(Object.keys(after.extraKnownMarketplaces ?? {}), ["other"], "only the declaration install wrote leaves");
     assert.equal(existsSync(join(project, IGNORE_FILE)), false, "with nothing left running Coherence, the ignore file goes as before");
+
+    // Claude Code's local scope in a git worktree is the main checkout's file: the mod is read, and its declaration dropped, there.
+    const git = (...args: string[]) => assert.equal(spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: project }).status, 0, args.join(" "));
+    git("commit", "-q", "--allow-empty", "-m", "start");
+    const tree = join(project, "tree");
+    git("worktree", "add", "-q", tree);
+    assert.equal(localSettingsPath(tree), join(realpathSync(project), ".claude", "settings.local.json"));
+    await writeFile(join(project, ".claude", "settings.local.json"), JSON.stringify({ enabledPlugins: { [MOD_ID]: true } }));
+    assert.equal(modInstalled(tree), true, "enabled in the main checkout is enabled in its worktree");
   } finally {
     await rm(project, { recursive: true, force: true });
   }

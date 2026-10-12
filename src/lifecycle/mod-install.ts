@@ -26,7 +26,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { spawnSync } from "./work-meter.ts";
 import { LOCAL_SETTINGS_FILE } from "./project.ts";
 
@@ -47,10 +47,22 @@ export const runClaude: ClaudeRunner = (args, cwd) => {
   return { status: ran.error === undefined ? ran.status : null, stdout: ran.stdout ?? "", stderr: ran.error === undefined ? (ran.stderr ?? "") : ran.error.message };
 };
 
-/** Whether the project's personal settings enable the mod. */
+/**
+ * The personal settings file Claude Code's local scope writes for a folder:
+ * the main checkout's, also for a folder in one of its git worktrees, since
+ * Claude Code knows a project by its repository. So enabling the mod in a
+ * worktree enables it in the main checkout and every worktree of it.
+ */
+export function localSettingsPath(root: string): string {
+  const common = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" });
+  const dir = common.status === 0 ? common.stdout.trim() : "";
+  return join(basename(dir) === ".git" ? dirname(dir) : root, LOCAL_SETTINGS_FILE.claude!);
+}
+
+/** Whether the personal settings Claude Code reads for this folder enable the mod. */
 export function modInstalled(root: string): boolean {
   try {
-    const settings = JSON.parse(readFileSync(join(root, LOCAL_SETTINGS_FILE.claude!), "utf8")) as { enabledPlugins?: Record<string, unknown> };
+    const settings = JSON.parse(readFileSync(localSettingsPath(root), "utf8")) as { enabledPlugins?: Record<string, unknown> };
     return settings.enabledPlugins?.[MOD_ID] === true;
   } catch {
     return false;
@@ -95,13 +107,13 @@ export function installMod(root: string, run: ClaudeRunner = runClaude): ModStep
  */
 export function uninstallMod(root: string, run: ClaudeRunner = runClaude): ModStep[] {
   const steps = [step(run, root, ["plugin", "uninstall", MOD_ID, "--scope", "local", "--json"])];
-  if (steps[0]!.ok && dropDeclaration(root)) steps.push({ args: ["marketplace declaration", MOD_MARKETPLACE], ok: true, said: `removed from ${LOCAL_SETTINGS_FILE.claude}; other projects keep the marketplace` });
+  if (steps[0]!.ok && dropDeclaration(root)) steps.push({ args: ["marketplace declaration", MOD_MARKETPLACE], ok: true, said: `removed from ${localSettingsPath(root)}; other projects keep the marketplace` });
   return steps;
 }
 
 /** Remove the personal settings' declaration of Coherence's marketplace, only when it names Coherence's repository; keeps the file's indentation. */
 function dropDeclaration(root: string): boolean {
-  const path = join(root, LOCAL_SETTINGS_FILE.claude!);
+  const path = localSettingsPath(root);
   let text: string;
   let settings: { extraKnownMarketplaces?: Record<string, { source?: { source?: unknown; repo?: unknown } }> };
   try {
