@@ -25,7 +25,7 @@
  * they remain that the mod answers no event they cover.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "./work-meter.ts";
 import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./project.ts";
@@ -140,4 +140,24 @@ function dropDeclaration(path: string): boolean {
   const indent = /^[ \t]+/m.exec(text)?.[0] ?? "  ";
   writeFileSync(path, JSON.stringify(settings, null, indent) + (text.endsWith("\n") ? "\n" : ""));
   return true;
+}
+
+/**
+ * Where Coherence's own repository keeps its mod for Claude Code: a link in
+ * the project's skills folder to the tree's own mods/coherence. Claude Code
+ * loads a plugin from there in every session in the folder and reloads it
+ * when a file of it is saved, so the main checkout and each worktree run
+ * their own mod, edits included. An installed copy of the mod for this
+ * repository or for the user takes the name first and the link is not
+ * loaded, so the repository never installs one.
+ */
+export const OWN_MOD_LINK = join(".claude", "skills", MOD_NAME);
+
+/** Whether the skills-folder link resolves to this tree's own mod. */
+export function ownModLinked(root: string): boolean {
+  try {
+    return realpathSync(join(root, OWN_MOD_LINK)) === realpathSync(join(root, MOD_FOLDER));
+  } catch {
+    return false;
+  }
 }
