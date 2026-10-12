@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
+import { modInstalled } from "./mod-install.ts";
 import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -161,9 +162,11 @@ test("the CLI installs into the current directory and reports status", async () 
   }
 });
 
-test("the checkout installs start hooks for both hosts", async () => {
+test("the checkout runs Coherence in both hosts: Claude Code through the mod its committed settings enable, Codex through its start hooks", async () => {
   const checkout = resolve(dirname(CLI), "..");
-  for (const host of ["claude", "codex"] as const) {
+  assert.equal(modInstalled(checkout, "project"), true, "claude: the committed settings enable the mod");
+  assert.deepEqual((await status(checkout, "claude")).installed, [], "claude: no settings hook of Coherence's beside the mod, which would hold it back");
+  for (const host of ["codex"] as const) {
     const found = await status(checkout, host);
     assert.equal(found.present, true, `${host}: the checkout must carry its hooks`);
     assert.deepEqual(found.missing, [], `${host}: all lifecycle events must be wired`);
