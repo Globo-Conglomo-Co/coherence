@@ -23,6 +23,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
+import { LOCKFILES, type PackageManager } from "./lockfiles.ts";
 import { installedPackage, projectFrom } from "../adapters/installed.ts";
 import { isOwnHook, searchesCheckoutFirst } from "./hook-command.ts";
 import { WRITERS, writersUnmatched } from "./host-tools.ts";
@@ -369,15 +370,7 @@ export function startUpdateCheck(root: string, event: string, env: Env = process
 
 // ---------------------------------------------------------------- the update line
 
-export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
-
-const LOCKFILES: readonly [string, PackageManager][] = [
-  ["pnpm-lock.yaml", "pnpm"],
-  ["yarn.lock", "yarn"],
-  ["bun.lock", "bun"],
-  ["bun.lockb", "bun"],
-  ["package-lock.json", "npm"],
-];
+export type { PackageManager };
 
 /** The project's package manager, by the lockfile nearest above `root` (to its repository's top); npm when there is none. */
 export function packageManager(root: string): PackageManager {

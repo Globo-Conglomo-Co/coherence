@@ -54,6 +54,8 @@ import { readProjectTextAsync } from "./work-meter.ts";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from "./lexicon.ts";
 import { STOPLIST } from "./stoplist.ts";
+import { singular } from "./inflection.ts";
+import { LOCKFILES } from "./lockfiles.ts";
 import { configIgnore, exclusionOf, projectFiles, underIgnored, walkBounds, type Bounds } from "../adapters/project-files.ts";
 import { CONFIG_FILE, isCoherenceItself, vocabularyFacts } from "./project.ts";
 import { PROSE_STORE_FOLDERS } from "../journal/stores.ts";
@@ -138,8 +140,8 @@ const DATA_EXTENSIONS = new Set([
   ".env", ".properties", ".xml", ".csv", ".tsv", ".graphql", ".proto",
 ]);
 
-/** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. */
-const EXCLUDED_NAMES = new Set(["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
+/** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. Every lockfile ci and the update line recognize (lockfiles.ts) is among them. */
+const EXCLUDED_NAMES = new Set([...LOCKFILES.map(([file]) => file), "npm-shrinkwrap.json", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
 
 /** The record folders under .coherence the check reads, the stores whose records are the writer's words; every other folder there is machine-written output (runs, traces, feed cursors). */
 const RECORD_FOLDERS = PROSE_STORE_FOLDERS;
@@ -418,13 +420,6 @@ function phraseRegex(phrases: string[]): RegExp | undefined {
     return body + plural;
   });
   return new RegExp(`(?<!${WORD})(?:${alternatives.join("|")})(?!${WORD})`, "gi");
-}
-
-function singular(term: string): string {
-  if (term.endsWith("ies") && term.length > 4) return term.slice(0, -3) + "y";
-  if (/(ss|sh|ch|x|z)es$/.test(term)) return term.slice(0, -2);
-  if (term.endsWith("s") && !term.endsWith("ss") && term.length > 3) return term.slice(0, -1);
-  return term;
 }
 
 /** Find which known phrase a matched text is, allowing for a plural. */

@@ -41,7 +41,7 @@
 
 import { isAbsolute } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
-import { effectiveConfig } from "../adapters/project-config.ts";
+import { effectiveConfig, type SetupKey } from "../adapters/project-config.ts";
 import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 
 export const CONFIG_FILE = "coherence.config.json";
@@ -120,7 +120,9 @@ export function setupClaims(setup: TestSetup, file: string): boolean {
   return setup.language === undefined || languageOfFile(file) === setup.language;
 }
 
-function testSetupOf(record: Record<string, unknown>, path: string, where: string): TestSetup {
+function testSetupOf(raw: Record<string, unknown>, path: string, where: string): TestSetup {
+  // Only the declared setup keys are read, so a key read here is one the registry inherits as a group.
+  const record = raw as { readonly [K in SetupKey]?: unknown };
   const setup: TestSetup = { language: undefined, files: undefined, cwd: undefined, test: commandValue(record["test"]), testMatch: undefined, testJson: commandValue(record["testJson"]), testFilterForm: record["testFilterForm"] === "pytest" ? "pytest" : "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
   const testMatch = record["testMatch"];
   if (typeof testMatch === "string" && testMatch !== "") {

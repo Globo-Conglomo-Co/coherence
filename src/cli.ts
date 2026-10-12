@@ -20,9 +20,9 @@
  *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hook-serve [--socket]    the warm hook process: answer events as JSON lines on stdin, and over a Unix socket (hook-serve.ts)
- *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
- *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
- *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
+ *   coherence hooks install --host <host>           merge one entry per event into the agent host's settings
+ *   coherence hooks uninstall --host <host>         remove exactly those entries; every other hook stays
+ *   coherence hooks --check --host <host>           exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence ci install --host github --mode fail|comment [--write]   the workflow that runs Coherence on every pull request (ci.ts)
  *   coherence ci report --session <id>   the pull request report as Markdown (ci-report.ts)

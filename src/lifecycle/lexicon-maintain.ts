@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { decide } from "../journal/verbs.ts";
 import { loadJournal, sessionFile } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
-import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
+import { DISPOSITIONS, digest, isSettled, lexiconCoverage } from "./lexicon-coverage.ts";
 import { aliasNames, parseLexicon, rejectedNames } from "./lexicon.ts";
 import { projectName } from "../adapters/project-config.ts";
 import { normalizeTerm, runCheck } from "./check.ts";
@@ -33,8 +33,12 @@ export interface Who {
   /** Earlier records the ruling rests on, passed through to the decision as --cite. */
   cite?: string[];
 }
+/** What a lexicon proposal may do to a concept. */
+export const CHANGE_ACTIONS = ["declare", "define", "alias", "reject", "lift", "rename", "retire"] as const;
+export type ChangeAction = (typeof CHANGE_ACTIONS)[number];
+
 export interface Change {
-  action: "declare" | "define" | "alias" | "reject" | "lift" | "rename" | "retire";
+  action: ChangeAction;
   name: string;
   value?: string;
   definition?: string;
@@ -608,11 +612,11 @@ export async function reviewLexicon(
 ): Promise<string> {
   writingFlags(who);
   confined(root, sessionFile(root, who.session));
-  if (!["confirmed", "not-domain", "deferred", "defect"].includes(disposition))
+  if (!(DISPOSITIONS as readonly string[]).includes(disposition))
     throw new Error(
-      "disposition must be confirmed, not-domain, deferred, or defect",
+      `disposition must be ${DISPOSITIONS.slice(0, -1).join(", ")}, or ${DISPOSITIONS.at(-1)}`,
     );
-  if (["confirmed", "not-domain"].includes(disposition) && !human?.trim())
+  if (isSettled(disposition) && !human?.trim())
     throw new Error(
       "a settled sense review needs --human acknowledgement; use deferred or defect without a ruling",
     );
