@@ -202,23 +202,25 @@ async function keepVerdict($: Engine, toolUseId: unknown, answer: HookAnswer): P
 /** The status line: Coherence's own (version, hook time against the budget, practices owed), then how its hooks are answered. */
 async function refreshStatus($: Engine): Promise<void> {
   const recent = held.times.slice(-20)
+  // The median, not the mean: a few heavy events (a leaf's first entry, a stop) would pull a mean far from the usual event.
   const mean = (via: Via): string => {
-    const these = recent.filter((t) => t.via === via)
-    return these.length === 0 ? '' : ` ${Math.round(these.reduce((s, t) => s + t.ms, 0) / these.length)} ms/event`
+    const these = recent.filter((t) => t.via === via).map((t) => t.ms).sort((a, b) => a - b)
+    return these.length === 0 ? '' : `, median ${Math.round(these[Math.floor(these.length / 2)]!)} ms`
   }
   const warm = held.warm
   const route = warm.state === 'warm' ? `warm${mean('warm')}` : warm.state === 'down' ? `cli per event${mean('cli')} (warm process down)` : warm.state === 'starting' ? 'warm process starting' : `cli per event${mean('cli')}`
-  let line = 'coherence'
+  let line = ''
   if (warm.state === 'warm' && held.last.session_id !== undefined) {
     try {
       const reply = await $.http.fetch('http://coherence/status', { method: 'POST', socketPath: warm.socket, body: JSON.stringify({ id: ++held.seq, op: 'status', input: held.last }) })
       const said = JSON.parse(reply.text) as { status?: unknown }
-      if (typeof said.status === 'string' && said.status !== '') line = said.status
+      // The host already leads the status line with the mod's name, so the text does not say coherence again.
+      if (typeof said.status === 'string' && said.status !== '') line = said.status.replace(/^coherence /, '')
     } catch {
       // The next event finds a process that is gone and says so; the status line keeps its last word until then.
     }
   }
-  $.ui.status(`${line} · ${route}`)
+  $.ui.status(line === '' ? route : `${line} · ${route}`)
 }
 
 /** What the agent reads when this mod's own hook failed: the event went on without Coherence's answer. */
@@ -343,6 +345,17 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {row}
         <Text color={verdict.value.isFailed ? 'error' : 'subtle'}>  ⎿ coherence {verdict.value.text}</Text>
+      </Box>
+    )
+  })
+
+  // One button in the band above the prompt, for the person: it opens Scope as /scope does, and yields to a survey.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    const { Box, Button } = $.ui.resolve(e)
+    return (
+      <Box>
+        <Button key="scope" label="Scope ↗" plain dimColor onPress={() => void openScope($)} />
       </Box>
     )
   })
