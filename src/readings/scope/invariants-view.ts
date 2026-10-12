@@ -62,7 +62,11 @@ function renderVerdict(state: ShellState, entry: LatestEntry | undefined): Marku
 function renderGoverned(enforcement: Extract<SpecEnforcement, { form: "chokepoint" }>, entry: LatestEntry | undefined): Markup | null {
   const ran = entry?.from;
   if (ran?.exempt !== undefined) {
-    const exempt = entry!.sites?.filter((s) => s.of === "protected" && s.class === "exempt").length;
+    // Exempt references the page carries, and those its window counted instead.
+    const exempt = entry!.sites === undefined
+      ? undefined
+      : entry!.sites.filter((s) => s.of === "protected" && s.class === "exempt").length +
+        (entry!.sitesLeft ?? []).filter((s) => s.of === "protected" && s.class === "exempt").reduce((sum, s) => sum + s.count, 0);
     const by = ran.by === "bullet" ? "its from: line" : ran.by === "config" ? "the config default" : "the default";
     return html`<p class="governs" data-field="from" data-exempt="${ran.exempt}"><span class="label">from</span> ${ran.value} <span class="quiet">(${by}): governs only references from outside <code>${ran.exempt}</code>; ${entry!.sitesUnresolved !== undefined ? `exempt references unknown: ${entry!.sitesUnresolved}` : exempt === undefined ? "exempt references unrecorded" : `${plural(exempt, "reference", "references")} from inside it exempt, reported and never a bypass`}</span></p>`;
   }

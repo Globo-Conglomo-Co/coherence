@@ -213,13 +213,29 @@ export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "becau
 
 export type { Form, Verdict, Grade, Governed, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
 import type { ChokepointFrom } from "../../spec/grammar.ts";
-import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+import type { Bypass, Form, Grade, RecordedSite, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
+
+/**
+ * Reference sites of one entry a page does not carry, counted by what every
+ * derivation over sites reads: the component the site is in (null for none),
+ * the endpoint, the class and the test mark. Set only by a page's window on a
+ * latest chokepoint entry, beside the sites it carries; never written to a run.
+ */
+export interface SiteTally {
+  component: string | null;
+  of: RecordedSite["of"];
+  class: RecordedSite["class"];
+  test: boolean;
+  count: number;
+}
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
 export interface LatestEntry extends RunEntry {
   at: string;
   commit: string | null;
   session: string;
+  /** On a page: the entry's sites the window left out, counted (see SiteTally). Absent when the page carries every site. */
+  sitesLeft?: SiteTally[];
 }
 
 export interface SpecInvariant {
@@ -352,6 +368,9 @@ export interface RunsData {
    */
   superseded?: Record<string, { pass: number; fail: number; notRun: number }>;
 }
+
+/** A run entry as a page may carry it: the window can leave some of a latest chokepoint entry's sites out, counted. */
+export type PageEntry = RunEntry & { sitesLeft?: SiteTally[] };
 
 /* The journal, as src/journal records it. */
 
