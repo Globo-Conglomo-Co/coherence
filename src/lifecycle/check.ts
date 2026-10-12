@@ -56,6 +56,8 @@ import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from ".
 import { STOPLIST } from "./stoplist.ts";
 import { configIgnore, exclusionOf, projectFiles, underIgnored, walkBounds, type Bounds } from "../adapters/project-files.ts";
 import { CONFIG_FILE, isCoherenceItself, vocabularyFacts } from "./project.ts";
+import { PROSE_STORE_FOLDERS } from "../journal/stores.ts";
+import { recordWords } from "../journal/record.ts";
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 import { proseNominations } from "./nomination.ts";
 import { applyBaseline, readBaseline, type BaselineSummary } from "./lexicon-baseline.ts";
@@ -139,8 +141,8 @@ const DATA_EXTENSIONS = new Set([
 /** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. */
 const EXCLUDED_NAMES = new Set(["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
 
-/** The record folders under .coherence the check reads; every other folder there is machine-written output (runs, traces, feed cursors). */
-const RECORD_FOLDERS = ["journal", "work"];
+/** The record folders under .coherence the check reads, the stores whose records are the writer's words; every other folder there is machine-written output (runs, traces, feed cursors). */
+const RECORD_FOLDERS = PROSE_STORE_FOLDERS;
 const COHERENCE_DIR = ".coherence";
 
 /**
@@ -602,29 +604,15 @@ function rejectedInData(file: CorpusFile, names: NameTable, guard: Guard): Rejec
 }
 
 /**
- * The fields of a record the writer authored as its own words. A decision's
- * `over` is the name it refused, quoted so the reader can see what drift was
- * turned away: naming it there is the record doing its job, not drift. The
- * bookkeeping a record carries (its id, session, agent, commit, the paths it
- * points at, the state it moved to) is the tool's spelling, not the agent's.
+ * The fields of a record the writer authored as its own words: those its
+ * role table (journal/record.ts) calls prose. A decision's `over` is the name
+ * it refused, quoted so the reader can see what drift was turned away: naming
+ * it there is the record doing its job, not drift. The bookkeeping a record
+ * carries (its id, session, agent, commit, the paths it points at, the state
+ * it moved to) is the tool's spelling, not the agent's.
  */
-const RECORD_METADATA: ReadonlySet<string> = new Set([
-  "id", "kind", "at", "session", "agent", "commit", "dirty", "binding", "of", "work",
-  "state", "owner", "to", "from", "file", "files", "path", "paths", "result", "results", "status",
-]);
-
-/** The name a record quotes as refused: `over` carries exactly what the decision turned away. */
-const RECORD_QUOTED: ReadonlySet<string> = new Set(["over"]);
-
-function recordStrings(value: unknown, out: string[]): void {
-  if (typeof value === "string") out.push(value);
-  else if (Array.isArray(value)) for (const v of value) recordStrings(v, out);
-  else if (typeof value === "object" && value !== null) {
-    for (const [k, v] of Object.entries(value)) {
-      if (RECORD_METADATA.has(k) || RECORD_QUOTED.has(k)) continue;
-      recordStrings(v, out);
-    }
-  }
+export function recordStrings(value: unknown, out: string[]): void {
+  out.push(...recordWords(value, (role) => role === "prose"));
 }
 
 /**

@@ -310,3 +310,9 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: run at the top read the whole repository as one project with the top's keys, so it ran specs no registry lists and wrote its records at the top (df-3c6a666d); the CI check runs there for a registry, and spec --check already read each listed project there
   refuted: runCommand never took the registry branch, so run at the top read the whole repository as one project again -> "run at a registry's top runs each listed project from its own folder, its records in each" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
+- a run's named invariants all name bullets: A run given --invariant names runs only if each one names a bullet, by its own name or as its component folder and name the way refute takes it; otherwise it runs nothing, records nothing, names each unmatched name and exits 64.
+  over: a real name beside a misspelled one, and a bullet given as its component folder and name
+  via: run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too
+  because: a name that matched no bullet was dropped without a word, so a run of nine names whose fifth was mistyped ran eight, reported them passing and exited 0, and a refutation confirmed through it would read as witnessed for a bullet it never ran (df-5c88f106)
+  refuted: let run go on without the names that match no bullet, as before -> "run refuses an --invariant that names no bullet, running nothing, and takes a bullet by its component folder and name too" went red in each.test.ts; restored (cmp), green batched and alone (2026-10-12)
+  kinds: none

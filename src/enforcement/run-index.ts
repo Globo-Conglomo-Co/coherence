@@ -28,13 +28,14 @@
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "../lifecycle/kept-parse.ts";
+import { storeDir } from "../journal/stores.ts";
 
 /** The shape of the index; one of another shape, or one other code made, is rebuilt. */
 const INDEX_SHAPE = "run-index-3";
 /** The code the index is made by: this module and the run records' parser. */
 const INDEX_CODE = ["enforcement/run-index.ts", "enforcement/record.ts"];
 
-const RUN_FILES = join(".coherence", "runs");
+const RUN_FILES = storeDir("runs");
 
 interface Latest {
   at: string;

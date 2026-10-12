@@ -37,6 +37,7 @@ import type { HttpApp, HttpAppFactory, HttpContext } from "../../enforcement/ser
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
+import { storeOfPath, type RecordStore } from "../../journal/stores.ts";
 import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
@@ -62,7 +63,8 @@ export interface LiveOptions {
   build?: Partial<BuildOptions>;
 }
 
-type Store = "journal" | "runs" | "work" | "model";
+/** A record store, or the model: the specs, the config and the lexicons. */
+type Store = RecordStore | "model";
 
 interface Cursor {
   at: string;
@@ -96,9 +98,8 @@ function json(response: ServerResponse, request: IncomingMessage, status: number
 /** Which store a changed path belongs to, or undefined when it is nothing the reading shows. */
 export function storeOf(path: string, lexicons: readonly string[]): Store | undefined {
   const name = path.split(sep).join("/");
-  if (name.startsWith(".coherence/journal/")) return "journal";
-  if (name.startsWith(".coherence/runs/")) return "runs";
-  if (name.startsWith(".coherence/work/")) return "work";
+  const store = storeOfPath(name);
+  if (store !== undefined) return store;
   if (name.startsWith(".git/") || name.startsWith(".coherence/") || name.startsWith("node_modules/") || name.includes("/node_modules/")) return undefined;
   if (name.endsWith(".spec.md") || name === "coherence.config.json" || lexicons.includes(name)) return "model";
   return undefined;
@@ -237,12 +238,16 @@ class LiveReading implements HttpApp {
       base.journal = { ...base.journal, work: { kind: "present", orders, damaged: loaded.damaged } };
       const changed = orders.filter((order) => fresh.has(order.id) || order.history.some((h) => fresh.has(h.id)));
       if (changed.length > 0) this.send("work", { orders: changed, damaged: loaded.damaged });
-    } else {
+    } else if (store === "model") {
       const state = await scopeState({ ...this.build, window: false, componentInterfaces: this.interfaces });
       this.base = state;
       this.remember(state);
       this.version += 1;
       this.send("snapshot", { state: windowState(state), version: this.versionId });
+    } else {
+      // A store the table names and no branch above reads fails to compile here, never refreshes silently.
+      const unread: never = store;
+      throw new Error(`no refresh reads the ${String(unread)} store`);
     }
   }
 
