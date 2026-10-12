@@ -248,7 +248,7 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   refuted: dropped every reference site in code no component owns, in readComponentInterfaces, instead of counting it into its callee -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - the prefilter never hides a cross-component reference: A declaration is asked for its references only when component code of another component spells its name or an alias it is given, star-imports or wildcard re-exports its module, or it is a default export, and a handler's reach asks what the files it has entered spell; the reading so asked is the reading that asks every declaration, interface for interface, site for site, and reach for reach.
-  over: every component interface, site count and entrance reach of a TypeScript project with a wildcard re-export, a renamed re-export, an alias and a default export, of a Python project with a star import, an alias and a getattr string, of the bounded fixture, and of Coherence's own tree, each read with and without the word index
+  over: every component interface, site count and entrance reach of a TypeScript project with a wildcard re-export, a renamed re-export, an alias and a default export, of a Python project with a star import, an alias and a getattr string, and of the bounded fixture, each read with and without the word index
   via: the prefilter never hides a cross-component reference
   because: a language server reports a reference only where the text names the thing, so a name no other component's text spells cannot have a site there; the escape hatches (a star import or wildcard re-export spells no name, an alias or default import spells another) are exactly where that argument needs help, and each is handled rather than assumed away
   crossing: instrument -> reading
@@ -668,4 +668,16 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   via: a page whose drawing throws shows the failure where the reader sees it, never a waiting line forever
   because: the page caught the ReferenceError from drawing the first load as if the connection had dropped, stored it as a reason, and never drew again, so the reader saw the waiting line forever and the cause only in a debugger
   refuted: let a drawing's error reach the connection loop again, as before -> "a page whose drawing throws shows the failure where the reader sees it, never a waiting line forever" went red in browser-bundle.test.ts; restored (cmp), green (2026-10-11)
+  kinds: none
+- a rule's plural is declared with the rule: Each entrance detection rule says its plural beside what it detects, in CANDIDATE_RULES; the plurals a count of undeclared entrances and a grouped entrance's line use are read off the rules, so a rule added there is counted in its own plural, never as its name with an s and never as detected entrances.
+  over: every rule of every language, counted once, three times and as a grouped entrance, and a rule two languages share
+  via: every detection rule says its own plural, and a count of entrances by rule reads it there
+  because: RULE_PLURALS was a table of its own and lacked request proxy and page route when those rules were added, so orient said "3 request proxys" and a group of page routes stood for "detected entrances" (df-5c6288f3)
+  refuted: made RULE_PLURALS a table of its own again, the sixteen plurals it held before, without request proxy and page route -> "every detection rule says its own plural, and a count of entrances by rule reads it there" went red in declared-once.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
+  kinds: none
+- the page model imports the tool's types: Scope's page model and views write out no closed list a tool module declares (a bullet's state and lacks, a practice's state and reach, an experiment step's result and outcome, a record's kind, a verdict); each is imported as a type, which the bundle strips, so the page compiles against the tool's own list.
+  over: every string-literal union and constant list in Scope's model and view sources, against every one the rest of src declares
+  via: Scope's page model and views write no closed list the tool's own modules declare; each is imported as a type
+  because: model.ts copied Lack, LifecycleState, PracticeState, the practice's reach and the close's results and outcome, believing the browser could not import the tool's modules; a type import is stripped before bundling, so the copies bought nothing and a state added to the tool would compile everywhere and be unknown to the page (c-a1a77f70)
+  refuted: wrote a practice's state out by hand in model.ts again, candidate or established in place of PracticeState -> "Scope's page model and views write no closed list the tool's own modules declare; each is imported as a type" went red in declared-once.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
   kinds: none

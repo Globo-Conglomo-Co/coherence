@@ -30,6 +30,8 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { HOOK_TIMES_DIR, type HookTime } from "./hook-latency.ts";
 import { TELEMETRY_TARGET, TELEMETRY_TIMEOUT_MS, type TelemetryTarget } from "./telemetry-config.ts";
+import { HOOK_EVENTS } from "./hook-events.ts";
+import { HOSTS as AGENT_HOSTS } from "./hosts.ts";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -37,9 +39,10 @@ export const SESSION_EVENT = "coherence session hooks";
 export const DEFECT_EVENT = "coherence defect recorded";
 
 /** The hook events a session summary may name: the host's events, never anything a project says. */
-export const SUMMARY_EVENTS = ["SessionStart", "SubagentStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "SubagentStop"] as const;
+export const SUMMARY_EVENTS = HOOK_EVENTS;
 const STATS = ["count", "p50_ms", "p95_ms", "max_ms"] as const;
-export const HOSTS = ["claude", "codex", "unknown"] as const;
+/** The agent hosts, as hosts.ts declares them, and unknown for a session no host claims. */
+export const HOSTS = [...AGENT_HOSTS, "unknown"] as const;
 export const PLATFORMS = ["darwin", "linux", "win32", "other"] as const;
 export const FILE_BUCKETS = ["<1k", "1k-10k", "10k-100k", ">100k"] as const;
 export const COMPONENT_BUCKETS = ["<10", "10-100", "100-1k", ">1k"] as const;

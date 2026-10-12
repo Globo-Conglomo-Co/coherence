@@ -26,13 +26,14 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { generate, LEAVES } from "./generate.ts";
+import { TOOL_HOOKS } from "../../src/lifecycle/hook-events.ts";
+import { DEFAULT_LATENCY_BUDGET } from "../../src/lifecycle/hook-latency.ts";
 
 const CLI = fileURLToPath(new URL("../../src/cli.ts", import.meta.url));
 const BUDGETS = fileURLToPath(new URL("./budgets.json", import.meta.url));
 /** The latency budget a tool hook is held to, in seconds, and the most a tool hook's budget here may be as a multiple of it. */
-const LATENCY_BUDGET_S = 3;
+const LATENCY_BUDGET_S = DEFAULT_LATENCY_BUDGET;
 const TOOL_MARGIN = 4;
-const TOOL_HOOKS = new Set(["PreToolUse", "PostToolUse"]);
 
 interface Step {
   label: string;

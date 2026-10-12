@@ -42,7 +42,7 @@ import { loadSeed } from "../spec/seed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { allLanguagesRead, languagesReadLine } from "../readings/scope/languages-read.ts";
 import { cliName } from "../lifecycle/hook.ts";
-import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapters } from "../readings/scope/component-interfaces.ts";
+import { BUDGET_FLAG_NAMES, BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapters } from "../readings/scope/component-interfaces.ts";
 import type { ScopedReading } from "../readings/scope/model.ts";
 import { scopedUnsettled } from "../readings/scope/scoped-route.ts";
 import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState } from "../readings/scope/gaps.ts";
@@ -260,8 +260,7 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
     work: "one",
     because: "one",
     cite: "many",
-    "interface-seconds": "one",
-    "interface-memory": "one",
+    ...Object.fromEntries(BUDGET_FLAG_NAMES.map((flag) => [flag, "one" as const])),
   });
   const root = io.cwd;
   const [name, ...rest] = parsed.positionals;

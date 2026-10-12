@@ -206,10 +206,11 @@ export type SpecChecklistLine =
   | { shape: string; outcome: "declared"; as: string; line: number }
   | { shape: string; outcome: "dismissed"; reason: string; line: number };
 
-/** The lifecycle state of a bullet, as src/spec derives it. */
-export type LifecycleState = "requirement" | "invariant" | "structural defect";
-
-export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
+/** The lifecycle state of a bullet and what it lacks, as src/spec derives them: its own types, imported as types, which the bundle strips. */
+export type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { State as LifecycleState, Lack } from "../../spec/state.ts";
+import type { PracticeState } from "../../spec/practices.ts";
+import type { Reach } from "../../spec/practice.ts";
 
 export type { Form, Verdict, Grade, Governed, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
 import type { ChokepointFrom } from "../../spec/grammar.ts";
@@ -637,7 +638,7 @@ export interface ScopePractice {
   component: string;
   file: string;
   kernel: boolean;
-  reach?: "kernel" | "internal" | undefined;
+  reach?: Reach | undefined;
   triggers: PracticeTrigger[];
   steps: { n: number; text: string; leaves?: string | undefined }[];
   pitfalls: { text: string; cites: string[] }[];
@@ -645,7 +646,7 @@ export interface ScopePractice {
   invariants: string[];
   because?: string | undefined;
   version: string;
-  state: "candidate" | "established";
+  state: PracticeState;
   enactments: number;
 }
 

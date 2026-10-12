@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
+import { modInstalled, ownModLinked } from "./mod-install.ts";
 import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -161,9 +162,17 @@ test("the CLI installs into the current directory and reports status", async () 
   }
 });
 
-test("the checkout installs start hooks for both hosts", async () => {
+test("Coherence's own repository runs each tree's own mod from its skills folder, never an installed copy, and Codex through its start hooks", async () => {
   const checkout = resolve(dirname(CLI), "..");
-  for (const host of ["claude", "codex"] as const) {
+  assert.equal(ownModLinked(checkout), true, "claude: the skills-folder link names this tree's mods/coherence");
+  assert.equal(modInstalled(checkout, "project"), false, "claude: no installed copy in the committed settings, which would take the mod's name before the link");
+  assert.deepEqual((await status(checkout, "claude")).installed, [], "claude: no settings hook of Coherence's beside the mod, which would hold it back");
+  const cli = (...args: string[]) => spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", ...args], { cwd: checkout, encoding: "utf8" });
+  const checked = cli("--check", "--host", "claude");
+  assert.equal(checked.status, 0, checked.stdout);
+  assert.match(checked.stdout, /this tree's own mod runs from \.claude\/skills\/coherence/);
+  assert.equal(cli("install", "--host", "claude", "--mod").status, 64, "installing a copy here is refused before anything runs");
+  for (const host of ["codex"] as const) {
     const found = await status(checkout, host);
     assert.equal(found.present, true, `${host}: the checkout must carry its hooks`);
     assert.deepEqual(found.missing, [], `${host}: all lifecycle events must be wired`);

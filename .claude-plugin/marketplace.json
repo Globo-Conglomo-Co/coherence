@@ -1,0 +1,5 @@
+{
+  "name": "coherence",
+  "owner": { "name": "PostHog" },
+  "plugins": [{ "name": "coherence", "source": "./mods/coherence", "description": "Coherence's hooks through one warm process per session, with its verdicts where the user reads them" }]
+}

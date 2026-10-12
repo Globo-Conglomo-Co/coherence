@@ -19,9 +19,10 @@
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
- *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
- *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
- *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
+ *   coherence hook-serve [--socket]    the warm hook process: answer events as JSON lines on stdin, and over a Unix socket (hook-serve.ts)
+ *   coherence hooks install --host <host>           merge one entry per event into the agent host's settings
+ *   coherence hooks uninstall --host <host>         remove exactly those entries; every other hook stays
+ *   coherence hooks --check --host <host>           exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence ci install --host github --mode fail|comment [--write]   the workflow that runs Coherence on every pull request (ci.ts)
  *   coherence ci report --session <id>   the pull request report as Markdown (ci-report.ts)
@@ -47,8 +48,9 @@ import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
+import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
+import { runHookServe } from "./lifecycle/hook-serve.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
@@ -57,6 +59,8 @@ import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
+import { keepAttributes, keepIgnore } from "./lifecycle/state-files.ts";
+import { installMod, modInstalled, ownModLinked, uninstallMod, MOD_ID, MOD_REPOSITORY, OWN_MOD_LINK, type ModStep } from "./lifecycle/mod-install.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
@@ -82,8 +86,10 @@ ${QUERY_USAGE}
 ${SCOPE_USAGE}
   coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
+  coherence hook-serve [--socket]   the warm hook process: {"op":"hook","event":...,"input":...} per line on stdin; --socket also over HTTP on a Unix socket
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
-  coherence hooks uninstall --host <${HOSTS.join("|")}>
+  coherence hooks install --host claude --mod [--shared]   Claude Code only: Coherence's mod answers every event through one warm process per session, in place of your personal settings hooks; --shared: for the whole team, in the committed settings, in place of the committed hooks
+  coherence hooks uninstall --host <${HOSTS.join("|")}>   removes the mod too
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
 ${CI_USAGE}
@@ -209,7 +215,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, startedAt: Math.round(performance.timeOrigin) });
+  const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: Math.round(performance.timeOrigin) });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -224,9 +230,25 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   return result.exit;
 }
 
+/** hook-serve [--socket]: the warm hook process for one agent-host session; it runs until stdin closes (or, with a socket, its parent is gone). */
+async function hookServeCommand(args: string[], root: string): Promise<number> {
+  const unknown = args.filter((arg) => arg !== "--socket");
+  if (unknown.length > 0) fail(`hook-serve: unexpected ${unknown.join(" ")}\n${USAGE}`);
+  const code = await runHookServe(root, { socket: args.includes("--socket"), hook: HOOK_STARTS });
+  // Stdin and the socket hold the event loop open; the process is done once the server says so.
+  process.exit(code);
+}
+
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
+/**
+ * What a hook starts in the background once its answer is made, given alike
+ * to the per-event hook and to the warm hook process, so both paths start the
+ * same work and keep the same records.
+ */
+const HOOK_STARTS = { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, mirrors: MIRROR_REFRESH } as const;
+
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
-  install: new Set(["host", "command", "local"]),
+  install: new Set(["host", "command", "local", "mod", "shared"]),
   uninstall: new Set(["host"]),
   check: new Set(["check", "host", "command", "local"]),
   status: new Set(),
@@ -265,7 +287,8 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
       ...(await Promise.all(shared.map((place) => Promise.all(HOSTS.map((host) => status(place.dir, host)))))).flat(),
       ...(await Promise.all(personal.map((place) => Promise.all(HOSTS.filter((host) => settingsFile(host, true) !== undefined).map((host) => status(place.dir, host, true)))))).flat(),
     ];
-    process.stdout.write(formatStatus(statuses) + "\n" + formatDeliveries(await deliveries(root), statuses));
+    const modLines = [...shared.filter((place) => modInstalled(place.dir, "project")).map(() => `claude: ${MOD_ID} enabled in the committed settings\n`), ...personal.filter((place) => modInstalled(place.dir)).map(() => `claude: ${MOD_ID} enabled in the personal settings\n`)].join("");
+    process.stdout.write(formatStatus(statuses) + modLines + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
   const host = flags.get("host");
@@ -275,6 +298,11 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   const given = flags.get("command");
   if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
   if (verb === "uninstall") {
+    // The mod first: while it is installed, the files .coherence keeps for git stay, since a host still runs Coherence.
+    if (host === "claude") {
+      for (const place of shared) if (modInstalled(place.dir, "project")) process.stdout.write(modSteps(uninstallMod(place.dir, undefined, "project")));
+      for (const place of personal) if (modInstalled(place.dir)) process.stdout.write(modSteps(uninstallMod(place.dir)));
+    }
     // Ours leave both the shared and the personal settings, wherever install put them.
     for (const place of shared) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
     if (settingsFile(host, true) !== undefined) {
@@ -289,6 +317,19 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
+      if (host === "claude" && !local && (await isCoherenceItself(place.dir))) {
+        // Coherence's own repository runs the tree's own mod from its skills folder, in place of hooks and of an installed copy.
+        const linked = ownModLinked(place.dir);
+        const shadowed = modInstalled(place.dir) || modInstalled(place.dir, "project");
+        process.stdout.write(!linked ? `claude: ${OWN_MOD_LINK} does not link this tree's mods/coherence, so no mod runs here\n` : shadowed ? `claude: ${MOD_ID} is installed for this repository and takes the name before ${OWN_MOD_LINK}, so the installed copy runs instead of this tree's mod; hooks uninstall --host claude removes it\n` : `claude: this tree's own mod runs from ${OWN_MOD_LINK} and reloads when a file of it is saved\n`);
+        drifted ||= !linked || shadowed;
+        continue;
+      }
+      if (host === "claude" && modInstalled(place.dir, local ? "local" : "project")) {
+        // The mod answers every event in place of the settings hooks at this scope.
+        process.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
+        continue;
+      }
       let result;
       try {
         result = await check(place.dir, host, await commandAt(place.sub), local);
@@ -301,6 +342,9 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
     }
     return drifted ? 1 : 0;
   }
+  if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
+  if (flags.get("mod") === true && (await isCoherenceItself(root))) fail(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead\n${USAGE}`);
+  if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(root, host, shared, given !== undefined || local) : modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);
     const registry = registryOf(root);
@@ -310,6 +354,72 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   }
   // The pull request side: offered once, only while no workflow runs Coherence.
   process.stdout.write(await ciSuggestion(root));
+  return 0;
+}
+
+/** Each `claude plugin` step, one line each, with what Claude Code said. */
+function modSteps(steps: readonly ModStep[]): string {
+  return steps.map((s) => `${s.args[0] === "plugin" ? "claude " : ""}${s.args.filter((a) => a !== "--json").join(" ")}: ${s.ok ? "" : "failed: "}${s.said}\n`).join("");
+}
+
+/**
+ * hooks install --host claude --mod: Coherence's marketplace and its mod at
+ * the personal scope, then Coherence's personal settings hooks out, since the
+ * mod stands aside for every event a settings hook of Coherence's covers. The
+ * committed hooks are the team's: kept, and named while they hold the mod back.
+ */
+async function modInstallCommand(root: string, host: string, personal: SettingsRoot, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
+  if (host !== "claude") fail(`hooks install --mod: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
+  if (flagged) fail(`hooks install --mod: the mod is always personal and finds Coherence itself; --local and --command do not apply\n${USAGE}`);
+  const steps = installMod(personal.dir);
+  process.stdout.write(modSteps(steps));
+  if (!steps.every((s) => s.ok) || steps.length < 2) {
+    process.stderr.write(`hooks install --mod: Claude Code did not install the mod; your settings hooks are unchanged\n`);
+    return 1;
+  }
+  const removed = await uninstall(personal.dir, "claude", true);
+  if (removed.removed.length > 0) process.stdout.write(formatUninstall("claude", removed));
+  const registry = registryOf(root);
+  for (const dir of registry === undefined ? [root] : registry.leaves) {
+    keepIgnore(dir, true);
+    keepAttributes(dir);
+  }
+  for (const place of shared) {
+    const held = (await status(place.dir, "claude")).installed;
+    if (held.length > 0) process.stdout.write(`claude: ${resolve(place.dir, settingsFile("claude")!)} still runs Coherence for ${[...new Set(held.map((h) => h.event))].join(", ")}; the mod answers none of those events while it does. Those hooks are committed and the team's: \`hooks uninstall --host claude\` removes them for everyone.\n`);
+  }
+  process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence; it loads in Claude Code sessions started here from now on, and /reload-plugins loads it into one already running.\n`);
+  return 0;
+}
+
+/**
+ * hooks install --host claude --mod --shared: the mod for the whole team.
+ * Coherence's marketplace and its mod in the committed settings, then the
+ * committed Claude Code hooks of Coherence's out, which the mod replaces for
+ * everyone; another host's hooks stay. A personal hook of Coherence's would
+ * hold the mod back for its owner, so each is named.
+ */
+async function sharedModInstallCommand(root: string, host: string, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
+  if (host !== "claude") fail(`hooks install --mod --shared: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
+  if (flagged) fail(`hooks install --mod --shared: the mod finds Coherence itself; --local and --command do not apply\n${USAGE}`);
+  for (const place of shared) {
+    const steps = installMod(place.dir, undefined, "project");
+    process.stdout.write(modSteps(steps));
+    if (!steps.every((s) => s.ok) || steps.length < 2) {
+      process.stderr.write(`hooks install --mod --shared: Claude Code did not install the mod in ${place.dir}; the committed hooks are unchanged\n`);
+      return 1;
+    }
+    const removed = await uninstall(place.dir, "claude");
+    if (removed.removed.length > 0) process.stdout.write(formatUninstall("claude", removed));
+    const personalHeld = (await status(place.dir, "claude", true)).installed;
+    if (personalHeld.length > 0) process.stdout.write(`claude: your personal settings still run Coherence for ${[...new Set(personalHeld.map((h) => h.event))].join(", ")}; the mod answers none of those events for you while they do: \`hooks uninstall --host claude\` removes them.\n`);
+  }
+  const registry = registryOf(root);
+  for (const dir of registry === undefined ? [root] : registry.leaves) {
+    keepIgnore(dir, true);
+    keepAttributes(dir);
+  }
+  process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence. Commit ${settingsFile("claude")}: Claude Code asks each teammate to install the marketplace and the mod when they next start a session here.\n`);
   return 0;
 }
 
@@ -376,6 +486,8 @@ async function main(argv: string[]): Promise<number> {
       return queryCommand(rest, io);
     case "hook":
       return hookCommand(rest, root);
+    case "hook-serve":
+      return hookServeCommand(rest, root);
     case "hooks":
       return hooksCommand(rest, root);
     case "telemetry":
