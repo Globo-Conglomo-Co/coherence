@@ -384,9 +384,9 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
-    // A row of its own, set off from the transcript above: the tool's name dim at the left, the button drawn as one at the right.
+    // A row of its own, set off from the transcript above: the tool's name dim, its button drawn as one right beside it, whatever the width.
     return (
-      <Box marginTop={1} justifyContent="space-between">
+      <Box marginTop={1} gap={2}>
         <Text dimColor>coherence</Text>
         <Button key="scope" label="Scope ↗" variant="primary" onPress={() => void openScope($)} />
       </Box>
