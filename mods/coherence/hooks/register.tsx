@@ -40,6 +40,8 @@ const held = {
   root: '',
   seq: 0,
   digest: undefined as string | undefined,
+  /** The last subagent stop's digest said, so the next identical one is not said again. */
+  lastSubagentDigest: undefined as string | undefined,
   last: {} as { session_id?: string; cwd?: string },
   aside: new Set<CoherenceEvent>(),
   times: [] as { event: string; via: Via; ms: number }[],
@@ -200,24 +202,38 @@ async function forward($: Engine, event: CoherenceEvent, input: Record<string, u
   return answer
 }
 
-/** A message as transcript lines: `$.ui.log` appends exactly one line, and draws a newline inside one as a stray glyph. */
-function logLines($: Engine, text: string): void {
-  for (const line of text.split('\n')) if (line.trim() !== '') $.ui.log(line)
+/**
+ * A message as one line: a transcript line and the text under an answer are
+ * each drawn on one line, a newline inside them as a stray glyph, and a row
+ * per line would bury the transcript, so its lines are joined: a heading's
+ * colon runs into what follows, and other lines are set apart with " · ".
+ */
+function oneLine(text: string): string {
+  // A heading's colon leads straight into what it heads; separate items are set apart.
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .reduce((joined, line) => (joined === '' ? line : `${joined}${joined.endsWith(':') ? ' ' : ' · '}${line}`), '')
 }
 
 /** What only the user reads: a stop's digest waits for the turn's end, anything else is transcript lines now. */
 function tell($: Engine, event: CoherenceEvent, user: string | undefined, debug: string | undefined): void {
   if (debug !== undefined && debug !== '') $.ui.log(`Coherence ${event}: ${debug}`, { to: 'debug' })
   if (user === undefined) return
+  const line = oneLine(user)
   if (event !== 'Stop') {
-    logLines($, user)
+    // Every subagent's stop says its digest; one the user has just read is not said again.
+    if (event === 'SubagentStop' && held.lastSubagentDigest === line) return
+    if (event === 'SubagentStop') held.lastSubagentDigest = line
+    $.ui.log(line)
     return
   }
-  held.digest = user
+  held.digest = line
   $.clock.after(DIGEST_WAIT_MS, () => {
-    if (held.digest === user) {
+    if (held.digest === line) {
       held.digest = undefined
-      logLines($, user)
+      $.ui.log(line)
     }
   })
 }
