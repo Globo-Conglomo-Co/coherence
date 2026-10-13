@@ -382,9 +382,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: answered every project with npm's command whatever its lockfile -> "a newer release in the kept answer is named at the session start with the update command for the project's package manager and its release-age setting" went red in version.test.ts on its own assertion (pnpm-lock.yaml); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - the update check adds no wait to a hook: A session start asks the npm registry for the newest version only by spawning version --refresh detached, its output ignored and unreferenced, after its answer is made, and only when the last attempt is a day old or there was none, or the kept answer is older than the running release, which asks once; the attempt's time is kept before the child runs, no other event starts one, and COHERENCE_NO_UPDATE_CHECK, CI and DO_NOT_TRACK each start none.
+  protects: refreshLatest
+  chokepoint: versionCommand
   over: every hook event, each of the three refusals, a first session start, another within the day, and one a day later
   via: the check of the newest version starts detached at a session start at most once a day, and never under COHERENCE_NO_UPDATE_CHECK, CI or DO_NOT_TRACK
-  because: the network never runs in a hook's own time: the tool hooks hold a 3 s budget and a session start the user waits on; a request a day is what the answer is worth, and an adopter or CI that wants none says so with one variable
+  because: the network never runs in a hook's own time: the tool hooks hold a 3 s budget and a session start the user waits on; a request a day is what the answer is worth, and an adopter or CI that wants none says so with one variable; the registry is asked only by refreshLatest, which only the version verb reaches, so no hook can call it in its own time
   refuted: left the spawned check referenced, so the hook's process waits for it -> "the check of the newest version starts detached at a session start at most once a day, and never under COHERENCE_NO_UPDATE_CHECK, CI or DO_NOT_TRACK" went red in version.test.ts on its own assertion (the hook never holds the child); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - a failed update check keeps the last answer: A registry request that fails or answers no version is dropped: the last answer and when it came stay, only the attempt's time moves, and coherence version names the newest published version with when the registry said so, the attempt that got no answer, and whether the check is on.
@@ -453,9 +455,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: the return reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
+  protects: writeCursor
+  chokepoint: src/journal/feed.ts
   over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it
   via: the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded
-  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded
+  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded; the cursor is written only inside the feed module, whose commit the command line calls, so no hook can move it before the print
   crossing: harness -> record
   refuted: committed the cursor inside runHook, before the command line had written stdout -> "the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded" went red in hook.test.ts: with the host's end of the pipe closed the cursor had moved and the host had nothing; restored, green (2026-09-17)
   kinds: state
@@ -645,9 +649,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: two local files are read; no dependency is sampled
   checklist: declared-target-coverage dismissed: one file of each kind per event, not a registry of targets
 - a hook voice file stays inside the root: A hook voice file is read only where its real path lies inside the project root; a file, or a folder above it, that links outside is named as not read and never followed, an unreadable one is named, and in both cases the event's canonical text stands.
+  protects: HOOK_VOICE_DIR
+  chokepoint: voiceFile
   over: a file linked outside the root, the hooks folder linked outside it, a link that stays inside it, and a folder where the file should be, at SessionStart
   via: a hook voice file whose real path leaves the project root is named as not read and never followed
-  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent
+  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent; the voice folder is reached only by voiceFile, which follows a link only to see where it leads, so no other reader can follow one out
   crossing: project-source -> reading
   refuted: dropped the within check in voiceFile, so a file whose real path left the project root was read -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
   kinds: read
@@ -1047,9 +1053,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: counted a run scoped by --invariant as a full run, and apart, counted a full run dated in the future -> "orient names an invariant floor no full run has graded in fourteen days; a scoped run and a run dated in the future move nothing" went red in defect-orient.test.ts on its own assertion each time (a scoped run held the note off; a run dated 2099 held it off); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - telemetry is sent only on opt-in: Fleet telemetry queues and sends nothing until the user runs telemetry on, which keeps the choice and a random installation id under the user's config directory, never in the project; DO_NOT_TRACK, COHERENCE_TELEMETRY=0, a build with no PostHog key, and a project's or its registry's "telemetry": false each refuse whatever the user chose, and off forgets the id and drops the queue.
+  protects: FETCH_SENDER
+  chokepoint: flushQueue
   over: a user who never opted in, one who did, each environment override, a build with no key, a project that refuses, and an opt-out with events queued
   via: nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins
-  because: Coherence runs in other people's code, so the widest self-correction loop may learn from an installation only when its user chose it, and a project or a machine that says no must be heard over any one user's yes (d-c00e7997)
+  because: Coherence runs in other people's code, so the widest self-correction loop may learn from an installation only when its user chose it, and a project or a machine that says no must be heard over any one user's yes (d-c00e7997); the one function that reaches the network is used only by the flush, which sends nothing unless telemetry is on
   refuted: telemetryState ignored a project's "telemetry": false -> "nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins" went red in telemetry.test.ts on its own assertion (a project's "telemetry": false refuses); restored byte for byte, green batched and alone (2026-10-07)
   kinds: output
   checklist: destination-confinement dismissed: events go to one destination, the batch endpoint of the host in telemetry-config.ts, and a redirect is refused
@@ -1080,9 +1088,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: one attempt per flush with a 5 s timeout and no retry, so a failing PostHog costs one request per session start or stop
   checklist: declared-target-coverage dismissed: one target, PostHog's batch endpoint, not a registry of targets
 - telemetry adds no wait to a hook: A hook starts telemetry only at a session start or a stop, after its answer is made, and only by spawning the flush detached with its output ignored and unreferenced, when something is queued or a session that is over awaits its summary; queuing an event appends one line and reads nothing back; the send happens in the detached flush, one request with a timeout, dropped after one attempt.
+  protects: flushQueue
+  chokepoint: telemetryCommand
   over: every hook event with telemetry on, an empty queue, a queued event, a session that is over, and a queue of 500 events taking one more
   via: telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line
-  because: the tool hooks hold a 3 s latency budget and run around every tool call; a send inside a hook would make the network's latency the user's, and a non-writing PostToolUse on this repository measured 191 ms with telemetry on against 192 ms with it off
+  because: the tool hooks hold a 3 s latency budget and run around every tool call; a send inside a hook would make the network's latency the user's, and a non-writing PostToolUse on this repository measured 191 ms with telemetry on against 192 ms with it off; the send is reached only through the telemetry verb's flush, which the hook starts detached, so no hook can call it in its own time
   refuted: startTelemetry left the flush referenced, so the hook's process waits for it -> "telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line" went red in telemetry.test.ts on its own assertion (the hook never holds the child); restored byte for byte, green batched and alone (2026-10-07)
   kinds: budget
   checklist: execution-budget declared as telemetry adds no wait to a hook
