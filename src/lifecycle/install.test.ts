@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
+import { budget } from "../enforcement/test-budgets.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
 import { modInstalled, ownModLinked } from "./mod-install.ts";
@@ -507,7 +508,8 @@ test("an installed package is located by its own cli before the project's bin, w
   }
 });
 
-test("a located Coherence answers, and refuses, as a direct command does", async () => {
+test("a located Coherence answers, and refuses, as a direct command does", async (t) => {
+  budget(t, 18, "d-6ce3a705");
   const parent = await mkdtemp(join(tmpdir(), "coherence-located-"));
   const project = join(parent, "project");
   try {
