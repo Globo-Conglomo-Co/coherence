@@ -22,7 +22,7 @@
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { perProcess } from "../lifecycle/process-caches.ts";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
 import { HOST_FOLDER } from "../lifecycle/hosts.ts";
 export { repositoryTop };
@@ -260,6 +260,15 @@ export function isVirtualEnvironment(dir: string): boolean {
   return existsSync(join(dir, "pyvenv.cfg"));
 }
 
+/**
+ * Whether a folder on disk is Cargo's build output: a folder named target
+ * beside a Cargo.toml. Named by its place, never by its name alone, since a
+ * folder called target elsewhere may hold the project's own code.
+ */
+export function isCargoTarget(dir: string): boolean {
+  return basename(dir) === "target" && existsSync(join(dirname(dir), "Cargo.toml"));
+}
+
 /** Whether a disk walk looking for folders (virtual environments, nested checkouts) may skip descending into one by its name: hidden, a host's, or an environment folder. */
 export function neverWalkedName(name: string): boolean {
   return name.startsWith(".") || HOST_FOLDERS.has(name) || ENVIRONMENT_FOLDERS.has(name);
@@ -275,6 +284,7 @@ function folderReason(bounds: Bounds, folder: string): string {
   else if (name.startsWith(".") && !bounds.readHidden) reason = `hidden folder: ${folder}`;
   else if (ENVIRONMENT_FOLDERS.has(name)) reason = `environment folder: ${folder}`;
   else if (isVirtualEnvironment(join(bounds.root, folder))) reason = `virtual environment: ${folder}`;
+  else if (isCargoTarget(join(bounds.root, folder))) reason = `Cargo build folder: ${folder}`;
   else reason = "";
   bounds.memo.set(folder, reason);
   return reason;

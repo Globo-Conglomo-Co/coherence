@@ -13,11 +13,17 @@
 // the stop's digest under the answer, a verdict on an edit's row, the hook
 // time and practices owed in the status line. Coherence refuses and informs;
 // it never grants a tool call.
+//
+// The band above the prompt holds two buttons for the person: Scope, the live
+// reading in the browser, and Journal, the session's journal told in a pane
+// (journal-pane.tsx), each record with a small tree of the files it touched.
 
 import type { EngineInterface as Engine, Register } from 'claude-code'
 import type { CoherenceVerdict } from '../types'
 import { WRITER_TOOLS } from './writers.ts'
 import { EVENTS, request, settingsRunCoherence, translate, verdictLine, type Classic, type CoherenceEvent, type HookAnswer } from './answer.ts'
+import { JOURNAL_COMMAND, JOURNAL_PANE, JOURNAL_TOOL, journalPane } from './journal-pane.tsx'
+import { place } from './place.ts'
 
 /** The tools whose PreToolUse Coherence's settings hook is installed for: the tools that write, as host-tools.ts declares them. */
 const PRACTICE_TOOLS = new Set(WRITER_TOOLS)
@@ -106,6 +112,9 @@ async function setUp($: Engine): Promise<void> {
   held.root = await $.session.root()
   held.timesFile = await $.env.get('COHERENCE_MOD_TIMES')
   held.cli = await locate($)
+  // The Journal pane reads where Coherence is from here: data only, never the engine interface.
+  place.root = held.root
+  place.cli = held.cli
   const hooks = (await $.settings.read()).hooks
   for (const event of EVENTS) if (settingsRunCoherence(hooks, event)) held.aside.add(event)
   if (held.aside.size > 0) $.ui.log(`Coherence: the settings hooks already run Coherence for ${[...held.aside].join(', ')}; the mod leaves those to them, since answering too would run each check twice. \`coherence hooks uninstall --host claude\` hands them to the warm process.`)
@@ -341,10 +350,14 @@ async function openScope($: Engine): Promise<void> {
 }
 
 export const register: Register = on => {
+  journalPane(on)
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await ready($)
     await $.command.register({ name: 'scope', description: "Open Coherence's live Scope reading in the browser", immediate: true })
+    await $.command.register(JOURNAL_COMMAND)
+    await $.tool.register(JOURNAL_TOOL)
     $.clock.every(3000, () => void refreshStatus($))
     return started
   })
@@ -396,7 +409,7 @@ export const register: Register = on => {
     )
   })
 
-  // One button in the band above the prompt, for the person: it opens Scope as /scope does, and yields to a survey.
+  // The band above the prompt, for the person: Scope opens as /scope does, Journal as /journal does; it yields to a survey.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -405,6 +418,7 @@ export const register: Register = on => {
       <Box marginTop={1} gap={2}>
         <Text dimColor>coherence</Text>
         <Button key="scope" label="Scope ↗" variant="primary" onPress={() => void openScope($)} />
+        <Button key="journal" label="Journal" onPress={() => void $.ui.open({ id: JOURNAL_PANE, title: 'Journal' })} />
       </Box>
     )
   })
