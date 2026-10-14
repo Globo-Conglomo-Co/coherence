@@ -99,9 +99,50 @@ ${TELEMETRY_USAGE}
 ${JOURNAL_USAGE}
 `;
 
+/**
+ * Where one call of the command line reads and writes: its output streams,
+ * its input, the folder it runs in and its environment. The binary hands it
+ * the process's own (below); the in-process harness (lifecycle/cli-harness.ts)
+ * hands it buffers, so a test runs a command without paying Node's start and
+ * Coherence's load once per call.
+ */
+export interface CommandCall {
+  stdout: CommandOutput;
+  stderr: CommandOutput;
+  stdin: NodeJS.ReadableStream;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  /** When the call began, in epoch milliseconds: what a hook's latency is measured from. The binary's is its process start. */
+  startedAt: number;
+}
+
+/** An output stream as a command writes it: process.stdout and process.stderr are ones. */
+export interface CommandOutput {
+  write(text: string, done?: (error?: Error | null) => void): boolean;
+  once?(event: "error", listener: (error: Error) => void): unknown;
+}
+
+/**
+ * A command that ends the call at once with a code: a usage error, or what a
+ * command threw. The binary exits the process there, as it always has; an
+ * in-process call returns the code with the message on its stderr.
+ */
+export class CommandExit extends Error {
+  readonly code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 function fail(message: string, code = 64): never {
-  process.stderr.write(message.endsWith("\n") ? message : message + "\n");
-  process.exit(code);
+  throw new CommandExit(code, message);
+}
+
+/** What a call that ended at once prints on stderr, and its exit code: a CommandExit's own, 70 (EX_SOFTWARE) for anything else thrown. */
+export function endedAt(error: unknown): { code: number; text: string } {
+  const exit = error instanceof CommandExit ? error : new CommandExit(70, error instanceof Error ? error.message : String(error));
+  return { code: exit.code, text: exit.message.endsWith("\n") ? exit.message : `${exit.message}\n` };
 }
 
 interface Parsed {
@@ -152,8 +193,8 @@ async function defaultCommand(root: string, sub = "", local = false): Promise<st
 const THIS_CLI = realpathSync(fileURLToPath(import.meta.url));
 
 /** After an adopter's install: say which Coherence the hooks will find, named as the session start names it, or how to make them find it. */
-function locateNote(root: string, sub = ""): string {
-  const found = locate(root, process.env, sub);
+function locateNote(call: CommandCall, root: string, sub = ""): string {
+  const found = locate(root, call.env, sub);
   const reached = reachNote(root, found === undefined ? undefined : realpathSync(found), THIS_CLI);
   if (reached !== undefined) return reached;
   return (
@@ -162,32 +203,32 @@ function locateNote(root: string, sub = ""): string {
   );
 }
 
-async function lexiconCommand(args: string[], root: string): Promise<number> {
+async function lexiconCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const io: Io = {
     cwd: root,
-    out: (line) => process.stdout.write(line + "\n"),
-    err: (line) => process.stderr.write(line + "\n"),
+    out: (line) => call.stdout.write(line + "\n"),
+    err: (line) => call.stderr.write(line + "\n"),
   };
   if (args[0] === "--help") return lexiconWorkCommand(["help"], io);
   if (args[0] && !args[0].startsWith("--")) return lexiconWorkCommand(args, io);
   const { flags, positionals } = parse(args, new Set());
   const unknown = [...flags.keys()].find((flag) => flag !== "check" && flag !== "json");
   if (unknown !== undefined) {
-    process.stderr.write(`lexicon: unknown flag --${unknown}\n`);
+    call.stderr.write(`lexicon: unknown flag --${unknown}\n`);
     return 1;
   }
   const { coherence, project } = await loadProjectLexicons(root);
   if (flags.has("check")) {
     const report = await runCheck({ root, paths: positionals, coherence, project });
-    process.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));
+    call.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));
     return hasFindings(report) ? 1 : 0;
   }
   if (flags.has("json")) {
-    process.stdout.write(JSON.stringify({ coherence, project: project ?? null }, null, 2) + "\n");
+    call.stdout.write(JSON.stringify({ coherence, project: project ?? null }, null, 2) + "\n");
     return 0;
   }
   const compact = renderCompact(coherence, project);
-  process.stdout.write(compact);
+  call.stdout.write(compact);
   const estimate = tokenEstimate(compact);
   let note = "";
   if (project !== undefined) {
@@ -196,33 +237,33 @@ async function lexiconCommand(args: string[], root: string): Promise<number> {
       note = `; the hook injects the project layer at detail "${within.detail}" (~${tokenEstimate(within.text).tokens} tokens) to stay under ${CONTEXT_BUDGET} characters`;
     }
   }
-  process.stderr.write(`~${estimate.tokens} tokens (${estimate.bytes} bytes / 4)${note}\n`);
+  call.stderr.write(`~${estimate.tokens} tokens (${estimate.bytes} bytes / 4)${note}\n`);
   return 0;
 }
 
 /** Write to stdout and settle only once the bytes were accepted, so what follows records an effect that happened. */
-function writeStdout(text: string): Promise<void> {
+function writeStdout(call: CommandCall, text: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    process.stdout.once("error", reject);
-    process.stdout.write(text, (error) => (error ? reject(error) : resolve()));
+    call.stdout.once?.("error", reject);
+    call.stdout.write(text, (error) => (error ? reject(error) : resolve()));
   });
 }
 
 /** The exit code for output the host never received (sysexits EX_IOERR). */
 const OUTPUT_LOST_EXIT = 74;
 
-async function hookCommand(args: string[], root: string): Promise<number> {
+async function hookCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
-  const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: Math.round(performance.timeOrigin) });
-  if (result.stderr !== "") process.stderr.write(result.stderr);
+  const input = await readStdinJson(call.stdin);
+  const result = await runHook(event, input, root, { ...HOOK_STARTS, startedAt: call.startedAt });
+  if (result.stderr !== "") call.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
-      await writeStdout(result.stdout);
+      await writeStdout(call, result.stdout);
     } catch (error) {
       // The host has nothing, so nothing is committed: an unprinted feed is shown again next time.
-      process.stderr.write(`hook ${event}: the output never reached the host (${error instanceof Error ? error.message : String(error)}); nothing was committed\n`);
+      call.stderr.write(`hook ${event}: the output never reached the host (${error instanceof Error ? error.message : String(error)}); nothing was committed\n`);
       return OUTPUT_LOST_EXIT;
     }
   }
@@ -230,14 +271,21 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   return result.exit;
 }
 
-/** hook-serve [--socket]: the warm hook process for one agent-host session; it runs until stdin closes (or, with a socket, its parent is gone). */
+/**
+ * hook-serve [--socket]: the warm hook process for one agent-host session; it
+ * runs until stdin closes (or, with a socket, its parent is gone). It serves
+ * the process's own stdin and stdout, so it ends the process: stdin and the
+ * socket hold the event loop open, and the process is done once the server
+ * says so (the entry below exits with its code).
+ */
 async function hookServeCommand(args: string[], root: string): Promise<number> {
   const unknown = args.filter((arg) => arg !== "--socket");
   if (unknown.length > 0) fail(`hook-serve: unexpected ${unknown.join(" ")}\n${USAGE}`);
-  const code = await runHookServe(root, { socket: args.includes("--socket"), hook: HOOK_STARTS });
-  // Stdin and the socket hold the event loop open; the process is done once the server says so.
-  process.exit(code);
+  return runHookServe(root, { socket: args.includes("--socket"), hook: HOOK_STARTS });
 }
+
+/** The verbs that serve the process's own streams until it ends: never run in-process, where the call's streams are buffers. */
+export const PROCESS_VERBS: ReadonlySet<string> = new Set(["hook-serve", "serve"]);
 
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
 /**
@@ -255,20 +303,20 @@ const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
 };
 
 /** adopt <folder>: one folder, relative to where the command runs; never the project root the other commands resolve to. */
-async function adoptCommand(args: string[]): Promise<number> {
+async function adoptCommand(call: CommandCall, args: string[]): Promise<number> {
   if (args.length !== 1 || args[0]!.startsWith("--")) fail(`adopt: one folder\n${USAGE}`);
   try {
-    const adopted = adopt(process.cwd(), args[0]!);
-    process.stdout.write(adoptText(adopted, await cliName(resolve(dirname(adopted.path), adopted.folder))));
+    const adopted = adopt(call.cwd, args[0]!);
+    call.stdout.write(adoptText(adopted, await cliName(resolve(dirname(adopted.path), adopted.folder))));
     return 0;
   } catch (error) {
     if (!(error instanceof AdoptError)) throw error;
-    process.stderr.write(`${error.message}\n`);
+    call.stderr.write(`${error.message}\n`);
     return 1;
   }
 }
 
-async function hooksCommand(args: string[], root: string): Promise<number> {
+async function hooksCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const { flags, positionals } = parse(args, new Set(["host", "command"]));
   // The check is the noun's --check, as lexicon --check and spec --check are; the other actions are verbs.
   const verb = flags.has("check") && positionals.length === 0 ? "check" : positionals[0];
@@ -288,7 +336,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
       ...(await Promise.all(personal.map((place) => Promise.all(HOSTS.filter((host) => settingsFile(host, true) !== undefined).map((host) => status(place.dir, host, true)))))).flat(),
     ];
     const modLines = [...shared.filter((place) => modInstalled(place.dir, "project")).map(() => `claude: ${MOD_ID} enabled in the committed settings\n`), ...personal.filter((place) => modInstalled(place.dir)).map(() => `claude: ${MOD_ID} enabled in the personal settings\n`)].join("");
-    process.stdout.write(formatStatus(statuses) + modLines + "\n" + formatDeliveries(await deliveries(root), statuses));
+    call.stdout.write(formatStatus(statuses) + modLines + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
   const host = flags.get("host");
@@ -300,15 +348,15 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (verb === "uninstall") {
     // The mod first: while it is installed, the files .coherence keeps for git stay, since a host still runs Coherence.
     if (host === "claude") {
-      for (const place of shared) if (modInstalled(place.dir, "project")) process.stdout.write(modSteps(uninstallMod(place.dir, undefined, "project")));
-      for (const place of personal) if (modInstalled(place.dir)) process.stdout.write(modSteps(uninstallMod(place.dir)));
+      for (const place of shared) if (modInstalled(place.dir, "project")) call.stdout.write(modSteps(uninstallMod(place.dir, undefined, "project")));
+      for (const place of personal) if (modInstalled(place.dir)) call.stdout.write(modSteps(uninstallMod(place.dir)));
     }
     // Ours leave both the shared and the personal settings, wherever install put them.
-    for (const place of shared) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
+    for (const place of shared) call.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
     if (settingsFile(host, true) !== undefined) {
       for (const place of personal) {
         const result = await uninstall(place.dir, host, true);
-        if (result.removed.length > 0 || result.removedIgnore) process.stdout.write(formatUninstall(host, result));
+        if (result.removed.length > 0 || result.removedIgnore) call.stdout.write(formatUninstall(host, result));
       }
     }
     return 0;
@@ -321,39 +369,39 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
         // Coherence's own repository runs the tree's own mod from its skills folder, in place of hooks and of an installed copy.
         const linked = ownModLinked(place.dir);
         const shadowed = modInstalled(place.dir) || modInstalled(place.dir, "project");
-        process.stdout.write(!linked ? `claude: ${OWN_MOD_LINK} does not link this tree's mods/coherence, so no mod runs here\n` : shadowed ? `claude: ${MOD_ID} is installed for this repository and takes the name before ${OWN_MOD_LINK}, so the installed copy runs instead of this tree's mod; hooks uninstall --host claude removes it\n` : `claude: this tree's own mod runs from ${OWN_MOD_LINK} and reloads when a file of it is saved\n`);
+        call.stdout.write(!linked ? `claude: ${OWN_MOD_LINK} does not link this tree's mods/coherence, so no mod runs here\n` : shadowed ? `claude: ${MOD_ID} is installed for this repository and takes the name before ${OWN_MOD_LINK}, so the installed copy runs instead of this tree's mod; hooks uninstall --host claude removes it\n` : `claude: this tree's own mod runs from ${OWN_MOD_LINK} and reloads when a file of it is saved\n`);
         drifted ||= !linked || shadowed;
         continue;
       }
       if (host === "claude" && modInstalled(place.dir, local ? "local" : "project")) {
         // The mod answers every event in place of the settings hooks at this scope.
-        process.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
+        call.stdout.write(local ? `claude: ${MOD_ID} is enabled in the personal settings and answers every event the committed hooks leave to it\n` : `claude: ${MOD_ID} is enabled in the committed settings and answers every event\n`);
         continue;
       }
       let result;
       try {
         result = await check(place.dir, host, await commandAt(place.sub), local);
       } catch (error) {
-        process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
+        call.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
         return 2;
       }
-      process.stdout.write(formatCheck(result));
+      call.stdout.write(formatCheck(result));
       drifted ||= result.drift.length > 0;
     }
     return drifted ? 1 : 0;
   }
   if (flags.get("shared") === true && flags.get("mod") !== true) fail(`hooks install --shared: --shared applies to --mod alone\n${USAGE}`);
   if (flags.get("mod") === true && (await isCoherenceItself(root))) fail(`hooks install --mod: Coherence's own repository runs each tree's own mod from ${OWN_MOD_LINK}; an installed copy would take its name and run instead\n${USAGE}`);
-  if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(root, host, shared, given !== undefined || local) : modInstallCommand(root, host, personal[0]!, shared, given !== undefined || local);
+  if (flags.get("mod") === true) return flags.get("shared") === true ? sharedModInstallCommand(call, root, host, shared, given !== undefined || local) : modInstallCommand(call, root, host, personal[0]!, shared, given !== undefined || local);
   for (const place of places) {
     const command = await commandAt(place.sub);
     const registry = registryOf(root);
     const result = await install({ root: place.dir, host, command, ignoreRoots: registry === undefined ? [root] : registry.leaves, local });
-    process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
-    if (command === locatedPrefix(place.sub, local)) process.stdout.write(locateNote(place.dir, place.sub));
+    call.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
+    if (command === locatedPrefix(place.sub, local)) call.stdout.write(locateNote(call, place.dir, place.sub));
   }
   // The pull request side: offered once, only while no workflow runs Coherence.
-  process.stdout.write(await ciSuggestion(root));
+  call.stdout.write(await ciSuggestion(root));
   return 0;
 }
 
@@ -368,17 +416,17 @@ function modSteps(steps: readonly ModStep[]): string {
  * mod stands aside for every event a settings hook of Coherence's covers. The
  * committed hooks are the team's: kept, and named while they hold the mod back.
  */
-async function modInstallCommand(root: string, host: string, personal: SettingsRoot, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
+async function modInstallCommand(call: CommandCall, root: string, host: string, personal: SettingsRoot, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
   if (host !== "claude") fail(`hooks install --mod: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
   if (flagged) fail(`hooks install --mod: the mod is always personal and finds Coherence itself; --local and --command do not apply\n${USAGE}`);
   const steps = installMod(personal.dir);
-  process.stdout.write(modSteps(steps));
+  call.stdout.write(modSteps(steps));
   if (!steps.every((s) => s.ok) || steps.length < 2) {
-    process.stderr.write(`hooks install --mod: Claude Code did not install the mod; your settings hooks are unchanged\n`);
+    call.stderr.write(`hooks install --mod: Claude Code did not install the mod; your settings hooks are unchanged\n`);
     return 1;
   }
   const removed = await uninstall(personal.dir, "claude", true);
-  if (removed.removed.length > 0) process.stdout.write(formatUninstall("claude", removed));
+  if (removed.removed.length > 0) call.stdout.write(formatUninstall("claude", removed));
   const registry = registryOf(root);
   for (const dir of registry === undefined ? [root] : registry.leaves) {
     keepIgnore(dir, true);
@@ -386,9 +434,9 @@ async function modInstallCommand(root: string, host: string, personal: SettingsR
   }
   for (const place of shared) {
     const held = (await status(place.dir, "claude")).installed;
-    if (held.length > 0) process.stdout.write(`claude: ${resolve(place.dir, settingsFile("claude")!)} still runs Coherence for ${[...new Set(held.map((h) => h.event))].join(", ")}; the mod answers none of those events while it does. Those hooks are committed and the team's: \`hooks uninstall --host claude\` removes them for everyone.\n`);
+    if (held.length > 0) call.stdout.write(`claude: ${resolve(place.dir, settingsFile("claude")!)} still runs Coherence for ${[...new Set(held.map((h) => h.event))].join(", ")}; the mod answers none of those events while it does. Those hooks are committed and the team's: \`hooks uninstall --host claude\` removes them for everyone.\n`);
   }
-  process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence; it loads in Claude Code sessions started here from now on, and /reload-plugins loads it into one already running.\n`);
+  call.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence; it loads in Claude Code sessions started here from now on, and /reload-plugins loads it into one already running.\n`);
   return 0;
 }
 
@@ -399,36 +447,36 @@ async function modInstallCommand(root: string, host: string, personal: SettingsR
  * everyone; another host's hooks stay. A personal hook of Coherence's would
  * hold the mod back for its owner, so each is named.
  */
-async function sharedModInstallCommand(root: string, host: string, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
+async function sharedModInstallCommand(call: CommandCall, root: string, host: string, shared: readonly SettingsRoot[], flagged: boolean): Promise<number> {
   if (host !== "claude") fail(`hooks install --mod --shared: the mod is Claude Code's; ${host} keeps its settings hooks\n${USAGE}`);
   if (flagged) fail(`hooks install --mod --shared: the mod finds Coherence itself; --local and --command do not apply\n${USAGE}`);
   for (const place of shared) {
     const steps = installMod(place.dir, undefined, "project");
-    process.stdout.write(modSteps(steps));
+    call.stdout.write(modSteps(steps));
     if (!steps.every((s) => s.ok) || steps.length < 2) {
-      process.stderr.write(`hooks install --mod --shared: Claude Code did not install the mod in ${place.dir}; the committed hooks are unchanged\n`);
+      call.stderr.write(`hooks install --mod --shared: Claude Code did not install the mod in ${place.dir}; the committed hooks are unchanged\n`);
       return 1;
     }
     const removed = await uninstall(place.dir, "claude");
-    if (removed.removed.length > 0) process.stdout.write(formatUninstall("claude", removed));
+    if (removed.removed.length > 0) call.stdout.write(formatUninstall("claude", removed));
     const personalHeld = (await status(place.dir, "claude", true)).installed;
-    if (personalHeld.length > 0) process.stdout.write(`claude: your personal settings still run Coherence for ${[...new Set(personalHeld.map((h) => h.event))].join(", ")}; the mod answers none of those events for you while they do: \`hooks uninstall --host claude\` removes them.\n`);
+    if (personalHeld.length > 0) call.stdout.write(`claude: your personal settings still run Coherence for ${[...new Set(personalHeld.map((h) => h.event))].join(", ")}; the mod answers none of those events for you while they do: \`hooks uninstall --host claude\` removes them.\n`);
   }
   const registry = registryOf(root);
   for (const dir of registry === undefined ? [root] : registry.leaves) {
     keepIgnore(dir, true);
     keepAttributes(dir);
   }
-  process.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence. Commit ${settingsFile("claude")}: Claude Code asks each teammate to install the marketplace and the mod when they next start a session here.\n`);
+  call.stdout.write(`The mod comes from ${MOD_REPOSITORY} and runs this project's own Coherence. Commit ${settingsFile("claude")}: Claude Code asks each teammate to install the marketplace and the mod when they next start a session here.\n`);
   return 0;
 }
 
 /** version: what runs and what is published; `--refresh` (which a session start runs detached) asks the registry first. */
-async function versionCommand(args: string[], root: string): Promise<number> {
+async function versionCommand(call: CommandCall, args: string[], root: string): Promise<number> {
   const unknown = args.filter((arg) => arg !== "--refresh");
   if (unknown.length > 0) fail(`version: unexpected ${unknown.join(" ")}\n${USAGE}`);
   if (args.includes("--refresh")) await refreshLatest();
-  process.stdout.write(versionText(root, await isCoherenceItself(root)));
+  call.stdout.write(versionText(root, await isCoherenceItself(root)));
   return 0;
 }
 
@@ -439,28 +487,28 @@ async function journalVet(root: string): Promise<(record: object) => string[]> {
   return (record) => vet(record).map((f) => `"${f.text}" is rejected for ${f.concept}: ${f.because}`);
 }
 
-async function main(argv: string[]): Promise<number> {
+export async function main(argv: string[], call: CommandCall): Promise<number> {
   const [verb, ...rest] = argv;
   // Every command acts on the project, wherever in it the command was run.
-  const root = projectRoot(process.cwd());
+  const root = projectRoot(call.cwd);
   const command = verb === undefined ? undefined : commands[verb];
   if (command !== undefined) {
     const io: Io = {
       cwd: root,
-      out: (line) => process.stdout.write(`${line}\n`),
-      err: (line) => process.stderr.write(`${line}\n`),
+      out: (line) => call.stdout.write(`${line}\n`),
+      err: (line) => call.stderr.write(`${line}\n`),
       ...(verb !== undefined && verb in journalVerbs ? { vet: await journalVet(root) } : {}),
     };
     return command(rest, io);
   }
   const io: Io = {
     cwd: root,
-    out: (line) => process.stdout.write(`${line}\n`),
-    err: (line) => process.stderr.write(`${line}\n`),
+    out: (line) => call.stdout.write(`${line}\n`),
+    err: (line) => call.stderr.write(`${line}\n`),
   };
   switch (verb) {
     case "lexicon":
-      return lexiconCommand(rest, root);
+      return lexiconCommand(call, rest, root);
     case "run":
       return runCommand(rest, io);
     case "refute":
@@ -479,17 +527,17 @@ async function main(argv: string[]): Promise<number> {
     case "calibrate":
       return calibrateCommand(rest, io);
     case "adopt":
-      return adoptCommand(rest);
+      return adoptCommand(call, rest);
     case "mass":
       return massCommand(rest, io);
     case "query":
       return queryCommand(rest, io);
     case "hook":
-      return hookCommand(rest, root);
+      return hookCommand(call, rest, root);
     case "hook-serve":
       return hookServeCommand(rest, root);
     case "hooks":
-      return hooksCommand(rest, root);
+      return hooksCommand(call, rest, root);
     case "telemetry":
       return telemetryCommand(rest, io);
     case "ci":
@@ -499,22 +547,37 @@ async function main(argv: string[]): Promise<number> {
     case "version":
     case "--version":
     case "-v":
-      return versionCommand(rest, root);
+      return versionCommand(call, rest, root);
     case "help":
     case "--help":
     case "-h":
-      process.stdout.write(USAGE);
+      call.stdout.write(USAGE);
       return 0;
     default:
       fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
   }
 }
 
-main(process.argv.slice(2)).then(
-  (code) => {
-    process.exitCode = code;
-  },
-  (error: unknown) => {
-    fail(error instanceof Error ? error.message : String(error), 70);
-  },
-);
+/**
+ * The binary: one call over the process's own streams, folder and
+ * environment. A call that ended at once (a usage error, a throw) exits the
+ * process there, and the warm hook process exits once its server is done;
+ * any other sets the exit code and lets the work it started finish. The
+ * in-process harness marks the process before it loads this module, and then
+ * nothing runs at load: it calls main itself, once per command.
+ */
+if ((globalThis as Record<symbol, unknown>)[Symbol.for("coherence.cli.in-process")] !== true) {
+  const argv = process.argv.slice(2);
+  const call: CommandCall = { stdout: process.stdout, stderr: process.stderr, stdin: process.stdin, cwd: process.cwd(), env: process.env, startedAt: Math.round(performance.timeOrigin) };
+  main(argv, call).then(
+    (code) => {
+      if (argv[0] === "hook-serve") process.exit(code);
+      process.exitCode = code;
+    },
+    (error: unknown) => {
+      const ended = endedAt(error);
+      process.stderr.write(ended.text);
+      process.exit(ended.code);
+    },
+  );
+}

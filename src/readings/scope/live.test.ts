@@ -5,10 +5,9 @@
  */
 
 import assert from "node:assert/strict";
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
@@ -283,13 +282,26 @@ test("the first load stays flat as the journal and the runs grow, every derived 
   }
 });
 
-test("every file the spec model reads by name refreshes the live reading: each spec and practice file it read for this repository, and the config", async () => {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+test("every file the spec model reads by name refreshes the live reading: each spec and practice file it read for a project with components and a practice, and the config", async () => {
+  // A project shaped as Coherence's own is (a root spec, components, a practice beside a spec), never Coherence's whole tree, whose listing costs more with every merge.
+  const root = mkdtempSync(join(tmpdir(), "coherence-live-model-"));
+  const files: Record<string, string> = {
+    [CONFIG_FILE]: JSON.stringify({ name: "model" }),
+    "Model.spec.md": "# Model\n\nThe project.\n",
+    "src/gadget/Gadget.spec.md": "# Gadget\n\nThe gadget.\n",
+    "src/gadget/Gadget.practice.md": "- tune the gadget: A gadget is tuned before it ships.\n  when: command gadget tune\n  step: tune it\n  because: an untuned gadget rattles\n",
+    "src/gadget/gadget.ts": "export const gadget = 1;\n",
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
   const scope = openWork();
   try {
     loadSpecModel(root, { runs: false });
   } finally {
     closeWork(scope);
+    rmSync(root, { recursive: true, force: true });
   }
   const named = scope.work.reads.filter((read) => read.startsWith("spec ") || read.startsWith("practice ")).map((read) => relative(root, read.slice(read.indexOf(" ") + 1)));
   assert.ok(named.some((file) => file.endsWith(".practice.md")), "the model read a practice file");

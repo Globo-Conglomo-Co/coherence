@@ -21,6 +21,7 @@ import { after, before, test } from "node:test";
 import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { PythonAdapter } from "../adapters/python.ts";
 import { formatRun } from "../enforcement/cli.ts";
+import { cli } from "../lifecycle/cli-fixture.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { loadSpecModel } from "../spec/model.ts";
@@ -271,7 +272,7 @@ test("an observation from another commit, or from a dirty tree, is stale in ever
   // The head moves on: the same record, read later, is stale.
   write("side/gamma.ts", GAMMA.replace("3", "4"));
   git("-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-qam", "move the head");
-  const moved = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("../cli.ts", import.meta.url)), "query", "observed"], { cwd: root, encoding: "utf8" });
+  const moved = await cli(["query", "observed"], { cwd: root });
   assert.equal(moved.status, 0, moved.stderr);
   assert.match(moved.stdout, /STALE: captured at \w+; the head is \w+/);
 });

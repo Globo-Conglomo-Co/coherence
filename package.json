@@ -24,7 +24,7 @@
     "lexicon:check": "node --disable-warning=ExperimentalWarning src/cli.ts lexicon --check",
     "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "COHERENCE_NO_WARM_UP=1 COHERENCE_TELEMETRY=0 COHERENCE_NO_UPDATE_CHECK=1 node --disable-warning=ExperimentalWarning --import=./src/enforcement/leak-guard.ts --test ${COHERENCE_TEST_SHARD:+--test-shard=$COHERENCE_TEST_SHARD} \"src/**/*.test.ts\"",
+    "test:unit": "COHERENCE_NO_WARM_UP=1 COHERENCE_TELEMETRY=0 COHERENCE_NO_UPDATE_CHECK=1 node --disable-warning=ExperimentalWarning --import=./src/enforcement/leak-guard.ts --test ${COHERENCE_TEST_SHARD:+--test-shard=$COHERENCE_TEST_SHARD} \"src/**/*.test.ts\" \"src/*.e2e.ts\"",
     "test": "npm run typecheck && npm run test:unit && npm run lexicon:check && npm run spec:check",
     "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts",

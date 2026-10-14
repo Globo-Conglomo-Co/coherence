@@ -13,7 +13,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { cli } from "../lifecycle/cli-fixture.ts";
 import { journalVerbs, type Io } from "./cli.ts";
 import { INSTRUMENT_IS_WRONG, type JournalRecord } from "./record.ts";
 import { JOURNAL_DIR, loadJournal } from "./store.ts";
@@ -620,16 +620,16 @@ test("the timeline after a cursor shows whole records", () => {
   }
 });
 
-test("the command line dispatches to the journal verbs", () => {
+test("the command line dispatches to the journal verbs", async () => {
   const cwd = scratch();
   try {
-    const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
-    const node = process.execPath;
-    const write = execFileSync(node, ["--disable-warning=ExperimentalWarning", cli, "decide", "via cli", "--because", "b", ...WHO], { cwd, encoding: "utf8" });
-    assert.match(write, /^d-[0-9a-f]{8}  decision recorded in \.coherence\/journal\/s1\.jsonl/);
-    const read = execFileSync(node, ["--disable-warning=ExperimentalWarning", cli, "journal"], { cwd, encoding: "utf8" });
-    assert.match(read, /via cli/);
-    assert.throws(() => execFileSync(node, [cli, "decide", "x", "--because", "b"], { cwd, encoding: "utf8", stdio: "pipe" }));
+    const write = await cli(["decide", "via cli", "--because", "b", ...WHO], { cwd });
+    assert.equal(write.status, 0, write.stderr);
+    assert.match(write.stdout, /^d-[0-9a-f]{8}  decision recorded in \.coherence\/journal\/s1\.jsonl/);
+    const read = await cli(["journal"], { cwd });
+    assert.equal(read.status, 0, read.stderr);
+    assert.match(read.stdout, /via cli/);
+    assert.notEqual((await cli(["decide", "x", "--because", "b"], { cwd })).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -676,7 +676,7 @@ test("a record the vet stands against is refused before anything is written", ()
   }
 });
 
-test("the command line acts on the project from any subfolder, and vets a record against the project's rejected names", () => {
+test("the command line acts on the project from any subfolder, and vets a record against the project's rejected names", async () => {
   const root = scratch();
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -684,24 +684,19 @@ test("the command line acts on the project from any subfolder, and vets a record
     writeFileSync(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }], rejected: [{ concept: "doohickey", because: "retired surface" }] }));
     const sub = join(root, "src", "deep");
     mkdirSync(sub, { recursive: true });
-    const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
-    const node = (...argv: string[]) => {
-      try {
-        return { code: 0, out: execFileSync("node", ["--disable-warning=ExperimentalWarning", cli, ...argv], { cwd: sub, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), err: "" };
-      } catch (error) {
-        const e = error as { status: number; stdout: string; stderr: string };
-        return { code: e.status, out: e.stdout, err: e.stderr };
-      }
+    const node = async (...argv: string[]) => {
+      const ran = await cli(argv, { cwd: sub });
+      return { code: ran.status, out: ran.stdout, err: ran.stderr };
     };
-    const written = node("decide", "from a subfolder", "--because", "b", "--session", "s1", "--agent", "main");
+    const written = await node("decide", "from a subfolder", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(written.code, 0, written.err);
     assert.equal(loadJournal(root).records.length, 1, "the record is the project's");
     assert.ok(!existsSync(join(sub, ".coherence")) && !existsSync(join(root, "src", ".coherence")), "no second store where the command stood");
-    const refused = node("decide", "keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    const refused = await node("decide", "keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(refused.code, 1);
     assert.match(refused.err, /"doohickey" is rejected for widgetry: retired surface/);
     assert.equal(loadJournal(root).records.length, 1, "the refused record never reached the store");
-    const quoted = node("decide", "keep the widget", "--over", "the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    const quoted = await node("decide", "keep the widget", "--over", "the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(quoted.code, 0, "a name a decision turns away, in its over, is the record doing its job");
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -7,9 +7,11 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
+import { budget } from "../enforcement/test-budgets.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import { CLAUDE_WRITER_MATCHER } from "./host-tools.ts";
 import { modInstalled, ownModLinked } from "./mod-install.ts";
+import { cli as inProcess } from "./cli-fixture.ts";
 import { driftOf, EARLIER_SEARCH, earlierHookLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -142,7 +144,7 @@ test("status reports what is installed per host and what other hooks were kept",
 test("the CLI installs into the current directory and reports status", async () => {
   const dir = await mkdtemp(join(tmpdir(), "coherence-cli-install-"));
   try {
-    const run = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude"], { cwd: dir, encoding: "utf8" });
+    const run = await inProcess(["hooks", "install", "--host", "claude"], { cwd: dir });
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /^wrote .*\.claude\/settings\.json: SessionStart, /);
     const written = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
@@ -150,12 +152,12 @@ test("the CLI installs into the current directory and reports status", async () 
     assert.ok(!written.hooks["Stop"]![0]!.hooks[0]!.command.includes(dir), "the committed command names no path on this machine");
     assert.match(run.stdout, /note: the hooks cannot find Coherence from here/, "install says the hooks will find nothing, and how to fix it");
 
-    const shown = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "status"], { cwd: dir, encoding: "utf8" });
+    const shown = await inProcess(["hooks", "status"], { cwd: dir });
     assert.equal(shown.status, 0, shown.stderr);
     assert.match(shown.stdout, /claude: .*\n  SessionStart: .*exec node "\$coherence" "\$@"; }; coherence hook SessionStart/);
     assert.match(shown.stdout, /codex: .*\(absent\)/);
 
-    const noHost = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install"], { cwd: dir, encoding: "utf8" });
+    const noHost = await inProcess(["hooks", "install"], { cwd: dir });
     assert.equal(noHost.status, 64);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -167,11 +169,11 @@ test("Coherence's own repository runs each tree's own mod from its skills folder
   assert.equal(ownModLinked(checkout), true, "claude: the skills-folder link names this tree's mods/coherence");
   assert.equal(modInstalled(checkout, "project"), false, "claude: no installed copy in the committed settings, which would take the mod's name before the link");
   assert.deepEqual((await status(checkout, "claude")).installed, [], "claude: no settings hook of Coherence's beside the mod, which would hold it back");
-  const cli = (...args: string[]) => spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", ...args], { cwd: checkout, encoding: "utf8" });
-  const checked = cli("--check", "--host", "claude");
+  const cli = (...args: string[]) => inProcess(["hooks", ...args], { cwd: checkout });
+  const checked = await cli("--check", "--host", "claude");
   assert.equal(checked.status, 0, checked.stdout);
   assert.match(checked.stdout, /this tree's own mod runs from \.claude\/skills\/coherence/);
-  assert.equal(cli("install", "--host", "claude", "--mod").status, 64, "installing a copy here is refused before anything runs");
+  assert.equal((await cli("install", "--host", "claude", "--mod")).status, 64, "installing a copy here is refused before anything runs");
   for (const host of ["codex"] as const) {
     const found = await status(checkout, host);
     assert.equal(found.present, true, `${host}: the checkout must carry its hooks`);
@@ -380,42 +382,42 @@ test("the check names every drift from what install would write: missing, stale,
 
 test("the CLI checks, uninstalls, and exits by what it found", async () => {
   const dir = await mkdtemp(join(tmpdir(), "coherence-cli-check-"));
-  const cli = (...args: string[]) => spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", ...args], { cwd: dir, encoding: "utf8" });
+  const cli = (...args: string[]) => inProcess(["hooks", ...args], { cwd: dir });
   try {
     const path = join(dir, ".claude", "settings.json");
     await mkdir(dirname(path), { recursive: true });
     const original = JSON.stringify(ADOPTER, null, 2) + "\n";
     await writeFile(path, original);
 
-    const absent = cli("--check", "--host", "claude");
+    const absent = await cli("--check", "--host", "claude");
     assert.equal(absent.status, 1, absent.stderr);
     assert.match(absent.stdout, /7 events drifted/);
 
-    assert.equal(cli("install", "--host", "claude").status, 0);
-    const clean = cli("--check", "--host", "claude");
+    assert.equal((await cli("install", "--host", "claude")).status, 0);
+    const clean = await cli("--check", "--host", "claude");
     assert.equal(clean.status, 0, clean.stdout);
     assert.match(clean.stdout, /all 7 events match/);
-    assert.match(cli("install", "--host", "claude").stdout, /^unchanged /, "a second install writes nothing");
+    assert.match((await cli("install", "--host", "claude")).stdout, /^unchanged /, "a second install writes nothing");
 
-    const other = cli("--check", "--host", "claude", "--command", "npx coherence");
+    const other = await cli("--check", "--host", "claude", "--command", "npx coherence");
     assert.equal(other.status, 1);
     assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*exec node \\"\$coherence\\" \\"\$@\\"; }; coherence hook SessionStart"; install would write "npx coherence hook SessionStart"/);
 
-    const gone = cli("uninstall", "--host", "claude");
+    const gone = await cli("uninstall", "--host", "claude");
     assert.equal(gone.status, 0, gone.stderr);
     assert.match(gone.stdout, /^claude: removed 7 Coherence hooks from /);
     assert.equal(await readFile(path, "utf8"), original);
-    assert.match(cli("uninstall", "--host", "claude").stdout, /no Coherence hook installed; nothing changed/);
+    assert.match((await cli("uninstall", "--host", "claude")).stdout, /no Coherence hook installed; nothing changed/);
 
     await writeFile(path, "{ not json");
-    const broken = cli("--check", "--host", "claude");
+    const broken = await cli("--check", "--host", "claude");
     assert.equal(broken.status, 2, "a settings file the check cannot read is neither clean nor drift");
     assert.match(broken.stderr, /^hooks --check: /);
 
-    assert.equal(cli("--check").status, 64, "the check names its agent host");
-    assert.equal(cli("uninstall").status, 64);
-    assert.equal(cli("uninstall", "--host", "claude", "--command", "x").status, 64, "uninstall takes no prefix: ownership is by the command");
-    assert.equal(cli("status", "--bogus").status, 64);
+    assert.equal((await cli("--check")).status, 64, "the check names its agent host");
+    assert.equal((await cli("uninstall")).status, 64);
+    assert.equal((await cli("uninstall", "--host", "claude", "--command", "x")).status, 64, "uninstall takes no prefix: ownership is by the command");
+    assert.equal((await cli("status", "--bogus")).status, 64);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -506,7 +508,8 @@ test("an installed package is located by its own cli before the project's bin, w
   }
 });
 
-test("a located Coherence answers, and refuses, as a direct command does", async () => {
+test("a located Coherence answers, and refuses, as a direct command does", async (t) => {
+  budget(t, 18, "d-6ce3a705");
   const parent = await mkdtemp(join(tmpdir(), "coherence-located-"));
   const project = join(parent, "project");
   try {
@@ -535,7 +538,7 @@ test("a located Coherence answers, and refuses, as a direct command does", async
 
     // A rejected name in a changed file: the subagent stop is refused exactly as a direct command refuses it.
     await writeFile(join(project, "notes.md"), "The doohickey turns.\n");
-    const direct = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SubagentStop"], { cwd: project, env: hostEnv("codex", project), input: JSON.stringify({ cwd: project, stop_hook_active: false }), encoding: "utf8" });
+    const direct = await inProcess(["hook", "SubagentStop"], { cwd: project, env: hostEnv("codex", project), stdin: JSON.stringify({ cwd: project, stop_hook_active: false }) });
     assert.equal(direct.status, REFUSE_EXIT, direct.stderr);
     for (const host of ["claude", "codex"] as const) {
       const refused = await runInstalled(project, host, "SubagentStop", { stop_hook_active: false }, env);
@@ -658,12 +661,12 @@ test("a PreToolUse matcher that leaves out a tool that writes is named by the ch
 });
 
 /** Run this checkout's command line in `cwd`, as a person does. */
-function cli(cwd: string, ...args: string[]): ReturnType<typeof spawnSync> {
+function cli(cwd: string, ...args: string[]): ReturnType<typeof inProcess> {
   // No warm instrument outlives the test: a session start would start one.
   const env: NodeJS.ProcessEnv = { ...process.env, COHERENCE_NO_WARM_UP: "1" };
   delete env["COHERENCE_HOME"];
   delete env["CLAUDE_PROJECT_DIR"];
-  return spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, ...args], { cwd, env, encoding: "utf8" });
+  return inProcess(args, { cwd, env });
 }
 
 test("Coherence's own repository runs its own source, in its main checkout and in each of its worktrees", async () => {
@@ -674,7 +677,7 @@ test("Coherence's own repository runs its own source, in its main checkout and i
     await writeFile(join(main, "package.json"), JSON.stringify({ name: PACKAGE_NAME, version: "9.9.9" }));
     // A stand-in for the repository's cli that says which file ran.
     await writeFile(join(main, "src", "cli.ts"), "console.log(process.argv[1]);\n");
-    const installed = cli(main, "hooks", "install", "--host", "claude");
+    const installed = await cli(main, "hooks", "install", "--host", "claude");
     assert.equal(installed.status, 0, String(installed.stderr));
     git(main, "init", "-q");
     git(main, "add", ".");
@@ -706,21 +709,21 @@ test("a developer points an adopter at a local checkout through COHERENCE_HOME, 
     };
 
     // The shared hooks the project commits, with COHERENCE_HOME set in the environment the host starts with.
-    const shared = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude"], { cwd: project, env: { ...process.env, CLAUDE_PROJECT_DIR: "", COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" }, encoding: "utf8" });
+    const shared = await inProcess(["hooks", "install", "--host", "claude"], { cwd: project, env: { ...process.env, CLAUDE_PROJECT_DIR: "", COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" } });
     assert.equal(shared.status, 0, shared.stderr);
     assert.match(shared.stdout, new RegExp(`\\nthe hooks reach the checkout COHERENCE_HOME names \\(${CHECKOUT.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\\), the Coherence running this install\\n`), "install names the copy as the session start does");
     assert.match(started(await runInstalled(project, "claude", "SessionStart", { session_id: "s1" }, { COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" })), /runs this session: the checkout COHERENCE_HOME names/);
-    assert.equal(cli(project, "hooks", "uninstall", "--host", "claude").status, 0);
+    assert.equal((await cli(project, "hooks", "uninstall", "--host", "claude")).status, 0);
 
     // No shared hook of ours: a personal install names the checkout's cli itself, and the check agrees with it.
     const prefix = `node ${CLI}`;
-    assert.equal(cli(project, "hooks", "install", "--host", "claude", "--local", "--command", prefix).status, 0);
+    assert.equal((await cli(project, "hooks", "install", "--host", "claude", "--local", "--command", prefix)).status, 0);
     const local = JSON.parse(await readFile(join(project, ".claude", "settings.local.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
     const command = local.hooks["SessionStart"]!.at(-1)!.hooks[0]!.command;
     assert.equal(command, `${prefix} hook SessionStart`);
     const ran = spawnSync("sh", ["-c", command], { cwd: project, env: hostEnv("claude", project, { COHERENCE_NO_WARM_UP: "1" }), input: JSON.stringify({ cwd: project, session_id: "s2" }), encoding: "utf8" });
     assert.match(started(ran), /runs this session: a checkout at /);
-    assert.equal(cli(project, "hooks", "--check", "--host", "claude", "--local", "--command", prefix).status, 0);
+    assert.equal((await cli(project, "hooks", "--check", "--host", "claude", "--local", "--command", prefix)).status, 0);
   } finally {
     await rm(parent, { recursive: true, force: true });
   }

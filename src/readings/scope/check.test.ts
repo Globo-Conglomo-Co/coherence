@@ -10,31 +10,30 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { loadRuns } from "../../enforcement/record.ts";
-import { loadJournal } from "../../journal/store.ts";
-import { loadSpecModel } from "../../spec/model.ts";
-import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, windowState, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
+import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, windowState, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { CITED_WINDOW, SITE_WINDOW, componentOfFile, sitesLeftCount, windowJournal, windowRuns, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { LatestEntry, Lexicon, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, SiteTally, StructurePreview, WorkOrder } from "./model.ts";
+import type { Lexicon, LexiconCoverage, PageEntry, RecordedSite, RunRecord, ShellState, SiteTally, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { flowOf } from "./structure-flow.ts";
 import { mergeSites } from "./updates.ts";
 
-const options: BuildOptions = {
-  lexiconPath: DEFAULTS.lexiconPath,
-  project: DEFAULTS.project,
-};
-
-
-const THREE_MB = 3 * 1024 * 1024;
+/**
+ * Coherence's lexicon over the fixture's tree. The page over Coherence's own
+ * tree (its size, every record embedded or counted, the site window over its
+ * own runs) is the bench job's (bench/scope/own-tree.ts): it reads the whole
+ * tree and every record, so it costs more with every merge, and no unit test
+ * reads Coherence's whole tree (enforcement/test-budgets.ts).
+ */
+let options: BuildOptions;
 
 let fixture: Fixture;
 let fixtureState: ShellState;
 
 before(async () => {
   fixture = makeFixture();
+  options = { root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: DEFAULTS.project };
   ({ state: fixtureState } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" }));
 });
 
@@ -69,16 +68,6 @@ function embeddedState(html: string): ShellState {
   assert.ok(match !== null && match[1] !== undefined, "the page embeds its state");
   return JSON.parse(match[1]) as ShellState;
 }
-
-test("the page builds to the default path and stays under 3 MB with Coherence's own data", async () => {
-  const { bytes, state } = await writeScopePage(options, DEFAULTS.outPath);
-  const onDisk = await readFile(DEFAULTS.outPath, "utf8");
-  assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
-  assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
-  assert.equal(state.spec.components.length, loadSpecModel(process.cwd()).components.length, "every component of Coherence's own tree is in the state");
-  assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), loadRuns(process.cwd()).records.length, "every run record is embedded or counted");
-  assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(process.cwd()).records.length, "every journal record is embedded or counted");
-});
 
 test("a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import", async () => {
   const { html, state } = await buildScopePage(options);
@@ -784,20 +773,7 @@ test("the first load carries at most the site window's reference sites however m
   const loaded = selectedOn(live, chokepoint);
   assert.doesNotMatch(loaded, /data-field="sites-left"/, "and nothing is left counted");
   assert.ok(loaded.includes(`${sites.length} recorded reference sites to the chokepoint or protected thing; owner component first.</p>`));
-
-  // Over Coherence's own runs: every latest verdict, and every chokepoint's sites carried or counted.
-  const own = (await buildScopePage(options)).state;
-  const ownWhole = (await buildScopePage({ ...options, window: false })).state;
-  const bare = (e: LatestEntry) => (({ sites: _s, sitesLeft: _l, ...rest }) => rest)(e);
-  for (const invariant of own.spec.components.flatMap((c) => c.invariants)) {
-    const [a, b] = [latestOf(invariant, own.runs.records), latestOf(invariant, ownWhole.runs.records)];
-    assert.deepEqual(a.map(bare), b.map(bare), `${invariant.name}: the latest entries are the same over the window`);
-    a.forEach((e, i) => {
-      if (b[i]!.sites !== undefined) assert.equal(e.sites!.length + sitesLeftCount(e), b[i]!.sites!.length, `${invariant.name}: every site carried or counted`);
-    });
-  }
-  assert.ok(own.runs.records.flatMap((r) => r.invariants).reduce((sum, e) => sum + (e.sites?.filter((s) => s.class !== "bypass").length ?? 0), 0) <= SITE_WINDOW, "Coherence's own page carries at most the window");
-  assert.deepEqual(weights(own), weights(ownWhole), "and its map's weights are the whole runs'");
+  // The same over Coherence's own runs is the bench job's (bench/scope/own-tree.ts): it reads every run Coherence recorded.
 });
 
 test("an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view", () => {

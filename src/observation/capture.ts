@@ -18,6 +18,7 @@
  */
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
+import { perProcess } from "../lifecycle/process-caches.ts";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -81,8 +82,8 @@ function real(path: string): string {
 }
 
 /** The project's files per real root, enumerated once per process; a path not among them is asked of git once more before it is refused. */
-const enumerated = new Map<string, ReadonlySet<string>>();
-const owned = new Map<string, boolean>();
+const enumerated = perProcess(new Map<string, ReadonlySet<string>>());
+const owned = perProcess(new Map<string, boolean>());
 
 function isOwned(realRoot: string, rel: string): boolean {
   let files = enumerated.get(realRoot);

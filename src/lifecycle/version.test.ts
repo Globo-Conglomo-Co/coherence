@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { cli } from "./cli-fixture.ts";
 import { runHook } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import type { Env } from "./telemetry.ts";
@@ -24,7 +24,6 @@ import {
 } from "./version.ts";
 
 const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const CLI = join(CHECKOUT, "src", "cli.ts");
 const VERSION = (JSON.parse(readFileSync(join(CHECKOUT, "package.json"), "utf8")) as { version: string }).version;
 
 /** `text` as a regular expression that matches it literally. */
@@ -232,15 +231,15 @@ test("hooks install names the Coherence the hooks reach as the session start nam
   assert.equal(reachNote(project, installed, sibling, env), `note: the hooks will run ${package_}, not a checkout at ../coherence, which runs this install\n`);
 });
 
-test("--version, -v, version, --help, -h and help answer at the top level", () => {
+test("--version, -v, version, --help, -h and help answer at the top level", async () => {
   const env = { ...process.env, ...userEnv({ COHERENCE_NO_UPDATE_CHECK: "1" }) };
   for (const flag of ["--version", "-v", "version"]) {
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
+    const run = await cli([flag], { cwd: CHECKOUT, env });
     assert.equal(run.status, 0, `${flag}: ${run.stderr}`);
     assert.match(run.stdout, new RegExp(`^coherence ${escaped(VERSION)}: this repository's own source\\.\\n`), flag);
   }
   for (const flag of ["--help", "-h", "help"]) {
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
+    const run = await cli([flag], { cwd: CHECKOUT, env });
     assert.equal(run.status, 0, `${flag}: ${run.stderr}`);
     assert.match(run.stdout, /^usage:\n/, flag);
     assert.match(run.stdout, /coherence version {3}\(or --version, -v\)/, flag);
