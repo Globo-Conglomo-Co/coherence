@@ -124,13 +124,17 @@ test("grades on JavaScript: broken with a bypass, then a pass once the bypass is
   assert.equal(clean.refutation, "automatic");
   assert.match(clean.reason, /2 test references/);
 
-  // A thing its module does not export. With `checkJs` off the compiler publishes no diagnostic for a JavaScript
-  // import of an unexported name, so the top rung's refutation cannot be witnessed: the check says so and stays
-  // "not run", never a pass claimed from a diagnostic that never came. (A project with `checkJs` gets the refusal.)
+  // A thing its module does not export. The project has `checkJs` off, so the compiler would check no JavaScript
+  // document; the refutation's probe asks for the check itself (`// @ts-check`), and the compiler refuses the import
+  // as an ES module's link would. Without that the check waited out its whole window for a diagnostic that never came.
+  const started = Date.now();
   const hidden = await checkChokepoint(adapter, { protects: "HIDDEN", chokepoint: "peek", ...hint, root });
+  const took = Date.now() - started;
   assert.equal(hidden.grade, "visibility-choked", hidden.reason);
-  assert.equal(hidden.verdict, "not run", hidden.reason);
-  assert.match(hidden.reason, /coherence-refutation-[0-9a-f]+\.mjs importing HIDDEN drew no diagnostic from the compiler/, "the account names the .mjs synthetic and the missing diagnostic");
+  assert.equal(hidden.verdict, "pass", hidden.reason);
+  assert.equal(hidden.refutation, "refused by the language", hidden.refutationAccount);
+  assert.match(hidden.refutationAccount ?? "", /coherence-refutation-[0-9a-f]+\.mjs importing HIDDEN was refused by the compiler/, "the account names the .mjs probe the compiler refused");
+  assert.ok(took < 5_000, `the refusal arrives as it does for TypeScript, never after the whole wait: ${took} ms`);
 });
 
 test("a TypeScript project that tracks its compiled output: the seed, the resolution and the cold-start text search stay on the TypeScript source", { timeout: 120_000 }, async () => {

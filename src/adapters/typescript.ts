@@ -739,7 +739,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}${syntheticExtensionBeside(protectedThing.file)}`;
-    const text = `import { ${name} } from "./${base}";\nexport const coherenceRefutation = ${name};\n`;
+    // A JavaScript document is type-checked only under checkJs or `// @ts-check`; without it the compiler publishes no
+    // diagnostic, and the refusal an ES module's link would raise is never seen. The probe asks for the check itself.
+    const checked = JAVASCRIPT_EXTENSIONS.has(extensionOf(synthetic)) ? "// @ts-check\n" : "";
+    const text = `${checked}import { ${name} } from "./${base}";\nexport const coherenceRefutation = ${name};\n`;
     this.diagnostics.delete(synthetic);
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: languageIdOf(synthetic), version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
