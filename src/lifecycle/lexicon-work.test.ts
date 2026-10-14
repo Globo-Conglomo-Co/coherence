@@ -546,8 +546,8 @@ test("Scope and the fixed lexicon query expose the same live sense evidence and 
 test("an installed hook command locates its project from a non-git subdirectory for both hosts", async () => {
   const { spawnSync } = await import("node:child_process");
   const { fileURLToPath } = await import("node:url");
+  const { cli } = await import("./cli-fixture.ts");
   const root = fixture();
-  const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
   try {
     writeFileSync(
       join(root, "package.json"),
@@ -560,15 +560,10 @@ test("an installed hook command locates its project from a non-git subdirectory 
     const env = { ...process.env };
     delete env.CLAUDE_PROJECT_DIR;
     for (const host of ["claude", "codex"]) {
-      const installed = spawnSync(
-        process.execPath,
-        [cli, "hooks", "install", "--host", host],
-        {
-          cwd: root,
-          env,
-          encoding: "utf8",
-        },
-      );
+      const installed = await cli(["hooks", "install", "--host", host], {
+        cwd: root,
+        env,
+      });
       assert.equal(installed.status, 0, installed.stderr);
       const settings = JSON.parse(
         readFileSync(

@@ -5,7 +5,6 @@
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -13,6 +12,7 @@ import type { Io } from "../journal/cli.ts";
 import { KEYS } from "../spec/grammar.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { applicableShapes, loadSeed } from "../spec/seed.ts";
+import { cli } from "../lifecycle/cli-fixture.ts";
 import { scaffoldCommand } from "./cli.ts";
 import { componentDir, scaffoldComponent } from "./scaffold.ts";
 import { renderInvariant } from "./scaffold.ts";
@@ -420,23 +420,14 @@ test("scaffold command types and runtime distinguish synchronous shapes from asy
 });
 
 
-test("the root CLI awaits scaffold preview and propagates its asynchronous exit code", () => {
+test("the root CLI awaits scaffold preview and propagates its asynchronous exit code", async () => {
   const { root } = previewFixture();
   try {
-    const cli = join(import.meta.dirname, "..", "cli.ts");
-    const success = spawnSync(
-      process.execPath,
-      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"],
-      { cwd: root, encoding: "utf8" },
-    );
+    const success = await cli(["scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"], { cwd: root });
     assert.equal(success.status, 0, success.stderr);
     assert.match(success.stdout, /preview wrote .*scope\.html/);
 
-    const invalid = spawnSync(
-      process.execPath,
-      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"],
-      { cwd: root, encoding: "utf8" },
-    );
+    const invalid = await cli(["scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"], { cwd: root });
     assert.equal(invalid.status, 1, invalid.stdout);
     assert.match(invalid.stderr, /crossing names trust level missing/);
   } finally {
