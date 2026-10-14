@@ -9,7 +9,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { runHook } from "./hook.ts";
 import { projectRoot, vocabularyFacts } from "./project.ts";
@@ -18,8 +17,7 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { configIgnore, configReferences } from "../adapters/project-files.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
-
-const CLI = fileURLToPath(new URL("../cli.ts", import.meta.url));
+import { cli as inProcess } from "./cli-fixture.ts";
 
 const spec = (name: string) => `# ${name}\n\nThe ${name} product.\n\n## invariants\n- ${name} door: ${name.toUpperCase()}_ROWS leave only through door.\n  protects: ${name.toUpperCase()}_ROWS\n  chokepoint: door\n  because: a fixture\n  kinds: none\n`;
 const practice = (name: string) => `- ${name}: Look before a change.\n  when: edit **/*.ts\n  step: list the folder\n  learned: d-0000abcd\n  because: a fixture\n`;
@@ -166,23 +164,23 @@ test("an event outside every leaf of a registry spawns no git and writes nothing
   }
 });
 
-test("spec --check names a nested config the registry does not list as adopted there but not opted in, at the top and in a leaf", () => {
+test("spec --check names a nested config the registry does not list as adopted there but not opted in, at the top and in a leaf", async () => {
   const top = monorepo();
   try {
-    const check = (cwd: string) => spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "spec", "--check"], { cwd, encoding: "utf8" });
-    const atTop = check(top);
+    const check = (cwd: string) => inProcess(["spec", "--check"], { cwd });
+    const atTop = await check(top);
     assert.equal(atTop.status, 1, atTop.stdout + atTop.stderr);
     assert.match(atTop.stdout, /2 projects; the rest of the repository is outside every project/);
     assert.match(atTop.stdout, /products\/errors: 1 component, 1 bullet/);
     assert.match(atTop.stdout, /PROBLEM {2}products\/stray\/coherence\.config\.json {2}adopted here but not opted in/);
     assert.doesNotMatch(atTop.stdout, /stray door/, "the stray's spec is never read");
-    assert.match(check(join(top, "products/errors")).stdout, /adopted here but not opted in/, "a leaf's check names it too");
+    assert.match((await check(join(top, "products/errors"))).stdout, /adopted here but not opted in/, "a leaf's check names it too");
   } finally {
     rmSync(top, { recursive: true, force: true });
   }
 });
 
-test("adopt lists a folder in the registry, keeping its layout, creates one when there is none, and refuses every bad case", () => {
+test("adopt lists a folder in the registry, keeping its layout, creates one when there is none, and refuses every bad case", async () => {
   const top = monorepo();
   const bare = repository({ "apps/billing/x.ts": "export const x = 1;\n", "apps/other/y.ts": "export const y = 1;\n" });
   const whole = repository({ "coherence.config.json": "{ \"name\": \"whole\" }\n", "apps/billing/x.ts": "export const x = 1;\n" });
@@ -205,7 +203,7 @@ test("adopt lists a folder in the registry, keeping its layout, creates one when
     refused(top, "products", /holds products\/notebooks/);
     refused(top, "missing", /not a folder/);
     refused(whole, "apps/billing", /whole-repository project/);
-    const cli = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "adopt", "apps/other"], { cwd: bare, encoding: "utf8" });
+    const cli = await inProcess(["adopt", "apps/other"], { cwd: bare });
     assert.equal(cli.status, 0, cli.stderr);
     assert.match(cli.stdout, /query practice "adopt Coherence"/, "the next step is the adopt practice");
   } finally {
@@ -213,10 +211,10 @@ test("adopt lists a folder in the registry, keeping its layout, creates one when
   }
 });
 
-test("hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf", () => {
+test("hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf", async () => {
   const top = monorepo();
   try {
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude", "--command", "npx coherence"], { cwd: join(top, "products/errors"), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
+    const run = await inProcess(["hooks", "install", "--host", "claude", "--command", "npx coherence"], { cwd: join(top, "products/errors"), env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
     assert.equal(run.status, 0, run.stderr);
     assert.match(readFileSync(join(top, ".claude/settings.json"), "utf8"), /npx coherence hook Stop/);
     assert.ok(!existsSync(join(top, "products/errors/.claude")), "never a leaf's own settings");

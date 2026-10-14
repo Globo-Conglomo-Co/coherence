@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import test from "node:test";
 import type { Io } from "../journal/cli.ts";
+import { cli } from "./cli-fixture.ts";
 import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { coverageText, lexiconCoverage } from "./lexicon-coverage.ts";
-
-const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "../cli.ts");
 
 
 function emptyRoot(): string {
@@ -65,7 +62,7 @@ test("root and workflow help are data-free, useful, and do not turn unknown flag
     assert.ok(rootHelp.out.join("\n").startsWith("usage:\n"));
     assert.match(rootHelp.out.join("\n"), /lexicon coverage \[--json\]/);
     assert.equal(rootHelp.err.length, 0);
-    const rootProcess = spawnSync(process.execPath, [CLI, "lexicon", "--help"], { cwd: root, encoding: "utf8" });
+    const rootProcess = await cli(["lexicon", "--help"], { cwd: root });
     assert.equal(rootProcess.status, 0, rootProcess.stderr);
     assert.ok(rootProcess.stdout.startsWith("usage:\n"));
     assert.match(rootProcess.stdout, /lexicon changes \[--session/);
@@ -81,7 +78,7 @@ test("root and workflow help are data-free, useful, and do not turn unknown flag
     const workflowUnknown = io(root);
     assert.equal(await lexiconWorkCommand(["changes", "--bogus"], workflowUnknown.io), 1);
     assert.match(workflowUnknown.err.join("\n"), /unknown flag --bogus/);
-    const rootUnknown = spawnSync(process.execPath, [CLI, "lexicon", "--bogus"], { cwd: root, encoding: "utf8" });
+    const rootUnknown = await cli(["lexicon", "--bogus"], { cwd: root });
     assert.equal(rootUnknown.status, 1);
     assert.match(rootUnknown.stderr, /unknown flag --bogus/);
     assert.equal(rootUnknown.stdout, "");

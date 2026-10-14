@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { perProcess } from "../lifecycle/process-caches.ts";
 
 const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_JSON = join(CODE_DIR, "..", "package.json");
@@ -58,7 +59,7 @@ export function codeFingerprint(): string {
   return salted(hash);
 }
 
-const held = new Map<string, string>();
+const held = perProcess(new Map<string, string>());
 
 /** The data files any parse may read at run time: every JSON file under src, the docs' JSON and package.json. */
 function dataFiles(): string[] {

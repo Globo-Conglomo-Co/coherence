@@ -285,6 +285,42 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: a CLI-level hook test started a detached warm server that outlived the test and raced its cleanup, with every test green, until COHERENCE_NO_WARM_UP=1 was set for the suite; the first guarded runs then found three more test files whose hooks left a warm server running, two of them only on CI's runners, and eight that left fixture folders or a socket in the temp folder, three of them only under a name filter
   refuted: made the leak guard name and remove what a test file leaves behind without failing the file -> "the leak guard fails a test file that leaves a process or a temp folder behind, names each, and passes one that cleans up" went red in leak-guard.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a test file pays Coherence's load a bounded number of times: A unit test file that launches Coherence's own command line (a node process whose arguments name this repository's src/cli.ts or dist/cli.js) and waits on it more than three times fails, naming the count, the file, each test's launches and the in-process cli() to use instead; a *.e2e.ts file, the home of spawned end-to-end tests, and a detached launch the code under test starts and lets go are not counted.
+  over: every spawn a test file's process makes, through any route to node's child_process, counted at the work meter's watch; a file over the budget, one at it, one whose launches run detached, and a *.e2e.ts file
+  via: the spawn budget fails a test file that launches Coherence's command line more than its budget, naming the count, the file, each test's launches and cli(), and passes one at the budget, one whose launches run detached, and a *.e2e.ts file
+  because: each launch pays Node's start and Coherence's load, about a second, and the tests kept doing it once per call: 23 of 76 test files, the --mod install tests at 8 s each, and the CI unit step from 136 s to 214 s in five days (df-608d319a); sharding bought time without stopping the pattern, so the pattern fails when the test is written
+  refuted: made the leak guard name a test file over its spawn budget without failing it -> "the spawn budget fails a test file that launches Coherence's command line more than its budget, naming the count, the file, each test's launches and cli(), and passes one at the budget, one whose launches run detached, and a *.e2e.ts file" went red in test-budgets.test.ts on its own assertion (the file over the budget passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as a test file pays Coherence's load a bounded number of times
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is a count of waited launches per test file
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on launched processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- a unit test runs under a ceiling: A unit test that runs longer than the suite's ceiling fails, naming its time, the ceiling and the ways out; a test may run longer only under a budget it declares with budget(t, seconds, because), which fails it past that budget and fails it when the decision it cites is not in the journal or the budget is not a finite number of seconds; the test keeps its own file and place in what the runner reports.
+  over: a test past the ceiling, one nested in a suite, one that calls back, one within a budget citing a decision, one past its own budget, one citing no decision, and one asking for an unbounded budget, under a lowered ceiling
+  via: the time ceiling fails a test that runs past it, nested or called back, in its own file's name and place, and holds a test that declares a budget citing a decision to that budget; a budget citing no decision, or none at all, fails
+  because: the suite's cost grew by tests that each looked cheap when written; a ceiling names the one that is not when it is written, and a budget that must cite a decision cannot become a silent skip
+  refuted: made the afterEach hook hold a test only to a budget it declared, never to the suite's ceiling -> "the time ceiling fails a test that runs past it, nested or called back, in its own file's name and place, and holds a test that declares a budget citing a decision to that budget; a budget citing no decision, or none at all, fails" went red in test-budgets.test.ts on its own assertion (the test past the ceiling passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as a unit test runs under a ceiling
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is one test's time
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: the ceiling bounds one test's time, not a count in a window
+  checklist: memory-budget dismissed: the bound is on time, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- no unit test reads Coherence's whole tree: A unit test file that lists, searches or compares Coherence's own tree (a git listing, grep, status, diff, log or rev-list, or a recursive tool, run inside this repository) fails, naming each read by the test that made it; a question about named files is no such read, and a reading over the whole tree belongs in the bench job.
+  over: every spawn a test file's process makes, with the folder it runs in; a listing of the repository and a listing of one named file
+  via: a unit test file that reads Coherence's own tree fails, naming each read; a question about one named file does not
+  because: a test over Coherence's own tree costs more with every merge: the prefilter's whole-tree pass grew from 55 s to 89 s of CI time in five days before it moved to the bench job (#103), and the Scope page over Coherence's own data was the slowest file in the suite until it moved too
+  refuted: made the whole-tree rule judge a spawn by the test process's folder, not by the folder the spawn runs in -> "a unit test file that reads Coherence's own tree fails, naming each read; a question about one named file does not" went red in test-budgets.test.ts on its own assertion (the listing of the repository passed); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: budget
+  checklist: execution-budget declared as no unit test reads Coherence's whole tree
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is zero whole-tree reads per unit test file
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads of the tree, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
 - unchanged sites are written once per run file: A run entry whose reference sites are exactly the ones its enforcement's last entry in the same run file wrote is written with a reference in their place, their content's hash and the run in that file that holds them in full; changed sites, and an enforcement's first entry in each run file, are written in full, so a reference never leaves its file and any one run file, alone, resolves; loadRuns resolves every reference back into the sites it names, in the place a full write puts them, so no reader sees a reference; and a reference its file cannot resolve is said on the entry, among the damaged lines, in Scope's reliance, enforcement card and flow map, and in query, never read as no sites.
   over: two runs with the same sites, a run whose sites changed, another session's file with the same sites, each file taken away in turn, and a reference its file does not hold
   via: a run whose sites did not change stores a reference within its own run file that resolves to the same sites; changed sites are stored in full; a reference no record holds is reported, never an empty list

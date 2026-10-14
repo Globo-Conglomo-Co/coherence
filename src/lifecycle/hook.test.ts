@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,6 +18,7 @@ import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT } from "./state-files.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { cli } from "./cli-fixture.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
 import { orientUndeclaredText } from "../readings/scope/undeclared.ts";
@@ -444,18 +445,17 @@ test("readStdinJson tolerates empty and malformed input", async () => {
   assert.deepEqual(await readStdinJson(Readable.from(['{"cwd":"/x",', '"stop_hook_active":true}'])), { cwd: "/x", stop_hook_active: true });
 });
 
-test("the CLI reads the event from stdin and uses its cwd", () => {
+test("the CLI reads the event from stdin and uses its cwd", async () => {
   // Started in the temp root's parent and told about the temp root on stdin: only the stdin cwd reaches Widgetry.
-  const run = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SessionStart"], {
-    input: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
-    encoding: "utf8",
+  const run = await cli(["hook", "SessionStart"], {
+    stdin: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
     cwd: tmpdir(),
   });
   assert.equal(run.status, 0, run.stderr);
   const parsed = JSON.parse(run.stdout) as { hookSpecificOutput: { additionalContext: string } };
   assert.match(parsed.hookSpecificOutput.additionalContext, /Widgetry vocabulary/);
 
-  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8", cwd: tmpdir() });
+  const bad = await cli(["hook", "NoSuchEvent"], { stdin: "{}", cwd: tmpdir() });
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /expected one of/);
 });
@@ -699,19 +699,19 @@ test("the peer feed injects subjects of other sessions' records since the cursor
   }
 });
 
-/** Run the hook CLI on an event; with `closePipe` the host's end of stdout is closed before the hook can write, as a host that died would leave it. */
-function spawnHook(dir: string, event: string, input: object, closePipe: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
+/**
+ * Run the hook CLI on an event as a spawned process whose host's end of stdout
+ * is closed before the hook can write, as a host that died would leave it: a
+ * real process boundary, which an in-process call has no pipe to lose.
+ */
+function spawnHookPipeClosed(dir: string, event: string, input: object): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", event], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] });
-    let stdout = "";
+    const stdout = "";
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => (stderr += chunk));
-    if (closePipe) child.stdout.destroy();
-    else {
-      child.stdout.setEncoding("utf8");
-      child.stdout.on("data", (chunk: string) => (stdout += chunk));
-    }
+    child.stdout.destroy();
     child.on("error", reject);
     child.on("close", (status) => resolve({ status, stdout, stderr }));
     child.stdin.end(JSON.stringify(input));
@@ -737,11 +737,11 @@ test("the feed cursor advances only after the feed is printed: rendering moves n
     assert.equal(typeof rendered.commit, "function", "the advance rides with the result for the caller that prints");
 
     // The CLI boundary: the host's end of the pipe is gone, so the write fails and the cursor must stay.
-    const lost = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, true);
+    const lost = await spawnHookPipeClosed(dir, "UserPromptSubmit", { session_id: "child", cwd: dir });
     assert.notEqual(lost.status, 0, `a hook whose output never reached the host does not exit 0: ${lost.stderr}`);
     assert.deepEqual(readCursor(dir, "child"), before, "the cursor did not move: the feed the host never received is shown again");
 
-    const printed = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, false);
+    const printed = await cli(["hook", "UserPromptSubmit"], { cwd: dir, stdin: JSON.stringify({ session_id: "child", cwd: dir }) });
     assert.equal(printed.status, 0, printed.stderr);
     assert.match(printed.stdout, /peer wrote/, "the unprinted feed is shown again");
     assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");

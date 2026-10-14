@@ -16,6 +16,7 @@ import { CHANGE_ACTIONS } from "./lexicon-maintain.ts";
 import { LOCKFILES } from "./lockfiles.ts";
 import { HOSTS as TELEMETRY_HOSTS, SUMMARY_EVENTS } from "./telemetry.ts";
 import { packageManager } from "./version.ts";
+import { cli } from "./cli-fixture.ts";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -48,7 +49,7 @@ function enumerated(text: string): string[] {
     .filter((s) => s !== "");
 }
 
-test("every list the hooks, telemetry, ci, the update line and the lexicon verbs share is read from the one module that declares it, and its usage and docs name exactly its members", () => {
+test("every list the hooks, telemetry, ci, the update line and the lexicon verbs share is read from the one module that declares it, and its usage and docs name exactly its members", async () => {
   // Telemetry summarizes the events the hook answers, and the hosts it installs into.
   assert.deepEqual([...SUMMARY_EVENTS], [...HOOK_EVENTS]);
   assert.deepEqual([...TELEMETRY_HOSTS], [...HOSTS, "unknown"]);
@@ -80,7 +81,7 @@ test("every list the hooks, telemetry, ci, the update line and the lexicon verbs
   }
 
   // Every command that takes the interface budget flags writes and parses them from one table.
-  const help = spawnSync(process.execPath, [join(REPO, "src", "cli.ts"), "help"], { encoding: "utf8" }).stdout;
+  const help = (await cli(["help"])).stdout;
   const written = help.split("\n").filter((line) => line.includes(`--${BUDGET_FLAG_NAMES[0]}`));
   assert.ok(written.length >= 3, "scope, query structure and scaffold control take the budget flags");
   for (const line of written) assert.ok(line.includes(BUDGET_FLAGS), `usage writes the budget flags from the table: ${line}`);

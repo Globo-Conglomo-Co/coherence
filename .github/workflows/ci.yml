@@ -1,5 +1,6 @@
 # Coherence checks itself on every pull request and every push to main: the
-# typecheck, the unit tests (in two shards), the lexicon and spec checks (what
+# typecheck, the unit tests (in two shards, with the spawned end-to-end set
+# in src/*.e2e.ts among them), the lexicon and spec checks (what
 # npm test runs), and a
 # chokepoint run over Coherence's own invariants. A test proves code behaves;
 # only the chokepoint run proves no code reaches around a declared door, and
@@ -161,3 +162,7 @@ jobs:
       # The prefilter over Coherence's own tree, read both ways: the unit suite proves it on fixtures; this reads the whole tree twice, so it lives here, out of the unit suite's time.
       - name: Prefilter over Coherence's own tree
         run: node --disable-warning=ExperimentalWarning bench/interfaces/own-tree.ts
+
+      # The Scope page over Coherence's own tree and every record it keeps: its size, and the site window over its own runs. The unit suite proves both on fixtures; no unit test reads Coherence's whole tree (src/enforcement/test-budgets.ts).
+      - name: Scope page over Coherence's own tree
+        run: node --disable-warning=ExperimentalWarning bench/scope/own-tree.ts

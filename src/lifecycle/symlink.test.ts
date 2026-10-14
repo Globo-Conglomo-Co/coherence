@@ -7,15 +7,14 @@
  */
 
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { cli, type CliResult } from "./cli-fixture.ts";
 import { writtenFiles } from "./hook.ts";
 
-const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
 const SPEC = "# Knobs\n\nKnobs turn.\n";
 
@@ -31,7 +30,7 @@ function practiceText(cite: string): string {
 }
 
 /** A project in a real folder, and a second spelling of it through a symbolic link beside it. */
-function linkedProject(): { real: string; linked: string; done: () => void } {
+async function linkedProject(): Promise<{ real: string; linked: string; done: () => void }> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), "coherence-symlink-")));
   const real = join(base, "real", "knobs");
   mkdirSync(join(real, "src", "knobs"), { recursive: true });
@@ -41,7 +40,7 @@ function linkedProject(): { real: string; linked: string; done: () => void } {
   writeFileSync(join(real, "src", "knobs", "Knobs.spec.md"), SPEC);
   writeFileSync(join(real, "src", "knobs", "dial.ts"), "export const dial = 1;\n");
   execFileSync("git", ["init", "-q"], { cwd: real });
-  const decided = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "decide", "oil knobs", "--because", "one seized", "--session", "s0", "--agent", "main"], { cwd: real, encoding: "utf8" });
+  const decided = await cli(["decide", "oil knobs", "--because", "one seized", "--session", "s0", "--agent", "main"], { cwd: real });
   assert.equal(decided.status, 0, decided.stderr);
   const cite = /\bd-[0-9a-f]{8}\b/.exec(decided.stdout)![0];
   writeFileSync(join(real, "src", "knobs", "Knobs.practice.md"), practiceText(cite));
@@ -49,13 +48,13 @@ function linkedProject(): { real: string; linked: string; done: () => void } {
   return { real, linked: join(base, "linked", "knobs"), done: () => rmSync(base, { recursive: true, force: true }) };
 }
 
-function preEdit(projectDir: string, cwd: string, file: string): { status: number | null; stdout: string; stderr: string } {
+function preEdit(projectDir: string, cwd: string, file: string): Promise<CliResult> {
   const input = { hook_event_name: "PreToolUse", session_id: "s1", cwd, tool_name: "Edit", tool_input: { file_path: file, old_string: "dial", new_string: "knob" } };
-  return spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "PreToolUse"], { cwd, input: JSON.stringify(input), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir, COHERENCE_NO_WARM_UP: "1" } });
+  return cli(["hook", "PreToolUse"], { cwd, stdin: JSON.stringify(input), env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir, COHERENCE_NO_WARM_UP: "1" } });
 }
 
-test("a project behind a symbolic link hears its hooks whichever spelling the host, the cwd and the edited file use", () => {
-  const { real, linked, done } = linkedProject();
+test("a project behind a symbolic link hears its hooks whichever spelling the host, the cwd and the edited file use", async () => {
+  const { real, linked, done } = await linkedProject();
   try {
     // writtenFiles names the project's own file under either spelling of the root or of the file.
     for (const [root, file] of [[real, join(linked, "src/knobs/dial.ts")], [linked, join(real, "src/knobs/dial.ts")], [linked, join(linked, "src/knobs/dial.ts")], [real, join(real, "src/knobs/dial.ts")]] as const) {
@@ -69,7 +68,7 @@ test("a project behind a symbolic link hears its hooks whichever spelling the ho
       [real, linked, join(real, "src/knobs/dial.ts")],
     ];
     for (const [projectDir, cwd, file] of spellings) {
-      const ran = preEdit(projectDir, cwd, file);
+      const ran = await preEdit(projectDir, cwd, file);
       assert.equal(ran.status, 0, ran.stderr);
       assert.match(ran.stdout, /oil the knob/, `CLAUDE_PROJECT_DIR ${projectDir}, cwd ${cwd}, file ${file}: the practice was not delivered\n${ran.stdout}${ran.stderr}`);
     }

@@ -11,6 +11,7 @@
  * rust-analyzer rust-src.
  */
 
+import { budget } from "../enforcement/test-budgets.ts";
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -209,7 +210,8 @@ test("the header, the use form and the scope are read from the text alone", () =
   assert.deepEqual(scopeOf("pub", ["kernel"]), { kind: "public" });
 });
 
-test("Rust grades: visibility-choked short of the crate, reference-choked for pub(crate) and pub, broken with a bypass, a #[cfg(test)] site is a test", { timeout: 300_000 }, async () => {
+test("Rust grades: visibility-choked short of the crate, reference-choked for pub(crate) and pub, broken with a bypass, a #[cfg(test)] site is a test", { timeout: 300_000 }, async (t) => {
+  budget(t, 40, "d-1c163ebf");
   const input = { chokepoint: "write_class", ...hint, root };
   // A private item: its module's subtree is its scope, and rustc refuses a path to it from the crate root.
   const choked = await checkChokepoint(adapter, { ...input, protects: "private_policy in src/kernel/mod.rs" });

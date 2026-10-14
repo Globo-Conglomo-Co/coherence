@@ -7,20 +7,18 @@
  */
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { after, test } from "node:test";
-import { fileURLToPath } from "node:url";
 import { appendRun, type RunEntry, type RunRecord } from "../enforcement/record.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { buildReport, ciReportCommand, renderReport, type GapReader } from "./ci-report.ts";
+import { cli } from "./cli-fixture.ts";
 import { ciInstallCommand, ciSuggestion, CiError, planWorkflow, REPORT_MARKER, WORKFLOW_PATH, workflowText } from "./ci.ts";
 
-const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
 const made: string[] = [];
 after(() => {
@@ -183,7 +181,7 @@ test("hooks install offers ci install and its two modes only while no workflow r
   const line = await ciSuggestion(bare);
   assert.match(line, /^CI: no workflow runs Coherence on pull requests; npx --no -- coherence ci install --host github --mode fail \(.+\) or --mode comment \(.+\) prints one, and --write writes it\.\n$/);
 
-  const installed = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude"], { cwd: bare, encoding: "utf8" });
+  const installed = await cli(["hooks", "install", "--host", "claude"], { cwd: bare });
   assert.equal(installed.status, 0, installed.stderr);
   assert.equal(installed.stdout.split("\n").filter((l) => l.startsWith("CI: ")).length, 1, "hooks install prints the offer once");
 
@@ -193,7 +191,7 @@ test("hooks install offers ci install and its two modes only while no workflow r
   assert.equal(await ciSuggestion(theirs), "", "a workflow of the adopter's own that runs the check");
   const unrelated = repository({ ".github/workflows/checks.yml": "jobs:\n  x:\n    steps:\n      - run: npm test\n" });
   assert.notEqual(await ciSuggestion(unrelated), "", "a workflow that does not run Coherence is no reason to stay quiet");
-  const again = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude"], { cwd: ours, encoding: "utf8" });
+  const again = await cli(["hooks", "install", "--host", "claude"], { cwd: ours });
   assert.equal(again.status, 0, again.stderr);
   assert.doesNotMatch(again.stdout, /^CI: /m, "with a workflow there, install says nothing of CI");
 });
@@ -273,7 +271,7 @@ test("run at a registry's top runs each listed project from its own folder, its 
     "products/stray/Stray.spec.md": SPEC("stray"),
   });
   try {
-    const ran = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "run", "--form", "chokepoint", "--no-server", "--session", "ci-1", "--agent", "ci"], { cwd: top, encoding: "utf8" });
+    const ran = await cli(["run", "--form", "chokepoint", "--no-server", "--session", "ci-1", "--agent", "ci"], { cwd: top });
     assert.equal(ran.status, 1, "b's bypass fails the run at the top");
     assert.match(ran.stdout, /^project products\/a:\n {2}\.\/a door\n[\s\S]*^project products\/b:\n {2}\.\/b door\n {4}chokepoint door protects ROWS: broken/m);
     assert.doesNotMatch(ran.stdout, /stray/, "a folder the registry does not list is not run");
