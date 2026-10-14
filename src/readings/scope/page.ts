@@ -22,10 +22,10 @@
  */
 
 import { componentOfHash, journalId, resolveHash } from "./derive.ts";
-import type { JournalKind, JournalRecord, LifecycleState, RunRecord, ShellState } from "./model.ts";
+import type { JournalKind, JournalRecord, LifecycleState, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
-import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, parseStream } from "./updates.ts";
+import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream } from "./updates.ts";
 
 /** The state a snapshot carries inline; undefined in the shell, whose state the warm server serves. */
 function readEmbeddedState(): ShellState | undefined {
@@ -254,6 +254,24 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       return;
     }
 
+    const sites = target.closest<HTMLButtonElement>("button[data-load-sites]");
+    if (sites !== null && live !== undefined) {
+      const run = sites.dataset["loadSites"] ?? "";
+      const component = sites.dataset["component"] ?? "";
+      const name = sites.dataset["name"] ?? "";
+      sites.disabled = true;
+      void live
+        .get(`/api/sites?run=${encodeURIComponent(run)}&component=${encodeURIComponent(component)}&name=${encodeURIComponent(name)}`)
+        .then((answer) => {
+          if (mergeSites(state, run, component, name, (answer as { sites: RecordedSite[] }).sites)) update();
+        })
+        .catch((error: unknown) => {
+          sites.disabled = false;
+          sites.textContent = `Could not load (${error instanceof Error ? error.message : String(error)}); try again`;
+        });
+      return;
+    }
+
     const one = target.closest<HTMLButtonElement>("button[data-load-record]");
     if (one !== null) {
       const id = one.dataset["loadRecord"] ?? "";
@@ -368,6 +386,38 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * A failure of the page itself, put where the reader sees it: a banner at the
+ * top of the root, replacing the waiting line if one is all the page shows.
+ * A drawing failure is never read as a lost connection, and never caught and
+ * kept where nothing shows it, so a page that cannot draw says so instead of
+ * waiting forever.
+ */
+function showFailure(root: HTMLElement, error: unknown): void {
+  const message = (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).replace(/[<&>]/g, "");
+  root.querySelector(".connection-waiting")?.remove();
+  let banner = root.querySelector<HTMLElement>("[data-failure]");
+  if (banner === null) {
+    banner = document.createElement("div");
+    banner.className = "absence page-failure";
+    banner.setAttribute("data-failure", "");
+    banner.setAttribute("role", "alert");
+    root.prepend(banner);
+  }
+  banner.innerHTML = `<p><strong>Scope could not draw this reading.</strong> ${message}</p><p>The reading reached this page and drawing it failed: a fault in Coherence's page, not in the warm server or the project. Reload to try again, and report it with this message.</p>`;
+}
+
+/** Run one drawing; on failure, show it and say so, so the caller stops instead of retrying what will fail the same way. */
+function drawn(root: HTMLElement, draw: () => void): boolean {
+  try {
+    draw();
+    return true;
+  } catch (error) {
+    showFailure(root, error);
+    return false;
+  }
+}
+
+/**
  * Follow the warm server: fetch the first load, then read the event stream
  * until it ends, merging each update and rendering; when it ends, say so and
  * reconnect with backoff (1, 2, 4, 8, then every 15 s), resuming from the
@@ -391,7 +441,8 @@ async function follow(root: HTMLElement, token: string): Promise<void> {
         const first = (await get("/api/state")) as { state: ShellState; version: string; history: { journal?: string; runs?: string } };
         state = first.state;
         state.connection = { mode: "live", status: "connecting", version: first.version, history: first.history };
-        shown = start(root, state, { get });
+        const live = state;
+        if (!drawn(root, () => (shown = start(root, live, { get })))) return;
       }
       const held: ShellState = state;
       const cursors = cursorsOf(held);
@@ -420,7 +471,7 @@ async function follow(root: HTMLElement, token: string): Promise<void> {
             changed = true;
           } else changed = applyUpdate(held, event.event, data) || changed;
         }
-        if (changed) shown?.update();
+        if (changed && !drawn(root, () => shown?.update())) return;
       }
       clearTimeout(silence);
     } catch (error) {
@@ -430,7 +481,7 @@ async function follow(root: HTMLElement, token: string): Promise<void> {
     attempt += 1;
     if (state !== undefined) {
       state.connection = { ...state.connection, mode: "live", status: "disconnected", attempt, reason };
-      shown?.update();
+      if (!drawn(root, () => shown?.update())) return;
     } else {
       root.innerHTML = `<p class="absence connection-waiting" data-connection="disconnected">Could not load the reading from the warm server (${reason.replace(/[<&>]/g, "")}); retrying, attempt ${attempt}.</p>`;
     }
@@ -441,10 +492,13 @@ async function follow(root: HTMLElement, token: string): Promise<void> {
 function boot(): void {
   const root = document.getElementById("scope-root");
   if (root === null) throw new Error("Scope: the root element is missing from this page.");
+  // Whatever fails later, in a handler or a promise nothing awaits, is shown on the page, not only in a console.
+  addEventListener("error", (event) => showFailure(root, event.error ?? event.message));
+  addEventListener("unhandledrejection", (event) => showFailure(root, event.reason));
   const embedded = readEmbeddedState();
   if (embedded !== undefined) {
     embedded.connection = { mode: "snapshot", status: "live" };
-    start(root, embedded, undefined);
+    drawn(root, () => start(root, embedded, undefined));
     return;
   }
   const token = new URLSearchParams(location.search).get("token");

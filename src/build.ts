@@ -15,7 +15,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { createRequire, stripTypeScriptTypes } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BROWSER_SOURCES, strippedName } from "./readings/scope/build.ts";
+import { browserSources, strippedName } from "./readings/scope/build.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src");
@@ -44,7 +44,8 @@ for (const file of files(src)) {
   const at = relative(src, file);
   if (/\.(json|css)$/.test(file) || dirname(at) === join(scope, "fonts")) copy(file, join(dist, at));
 }
-for (const name of BROWSER_SOURCES) {
+// The same modules the page joins, found the same way: from the entry, by what each imports at run time.
+for (const name of await browserSources()) {
   const source = readFileSync(join(src, scope, name), "utf8");
   writeFileSync(join(dist, scope, strippedName(name)), stripTypeScriptTypes(source, { mode: "strip" }));
 }

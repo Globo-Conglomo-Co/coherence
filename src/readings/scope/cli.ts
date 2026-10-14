@@ -6,7 +6,7 @@
  *       the tokened address and open it in the browser (not with --no-open)
  *   coherence scope --snapshot [--out <file>] [--root <project>] [--lexicon <path>] [--domain <path>]
  *                   [--domain-title "<title>"] [--project <name>] [--no-interfaces]
- *                   [--interface-seconds <n>] [--interface-memory <MB>]
+ *                   <the budget flags, BUDGET_FLAGS>
  *       write one self-contained file: the shell with the state inline
  *
  * `--out` alone also writes a snapshot, so `npm run -s scope -- --root <dir>
@@ -19,7 +19,7 @@ import { withWarmAdapter } from "../../enforcement/run.ts";
 import type { Io } from "../../journal/cli.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
-import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
+import { BUDGET_FLAG_NAMES, BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import { keptLine } from "./kept-answers.ts";
 
@@ -29,7 +29,7 @@ export const SCOPE_USAGE = [
   "                                     write one self-contained file: the shell with the state inline (--out alone does the same)",
 ].join("\n");
 
-const VALUED = new Set(["root", "out", "lexicon", "domain", "domain-title", "project", "interface-seconds", "interface-memory"]);
+const VALUED = new Set(["root", "out", "lexicon", "domain", "domain-title", "project", ...BUDGET_FLAG_NAMES]);
 const SWITCHES = new Set(["snapshot", "no-open", "no-interfaces"]);
 
 function parse(argv: string[]): { values: Map<string, string>; switches: Set<string> } | string {

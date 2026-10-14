@@ -26,6 +26,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { registryOf, repositoryTop } from "../adapters/project-config.ts";
 import type { Io } from "../journal/cli.ts";
 import { isCoherenceItself, PACKAGE_NAME } from "./project.ts";
+import { LOCKFILES, type PackageManager as AnyManager } from "./lockfiles.ts";
 
 export const CI_HOSTS = ["github"] as const;
 export type CiHost = (typeof CI_HOSTS)[number];
@@ -56,16 +57,18 @@ const ACTIONS = {
 /** The pnpm major the workflow installs when package.json names no packageManager; lockfile 9.0 is what pnpm 9 and 10 write. */
 const PNPM_DEFAULT = "10";
 
-export type PackageManager = "npm" | "pnpm";
+/** The package managers the workflow sets up. */
+const CI_MANAGERS = ["npm", "pnpm"] as const;
+export type PackageManager = (typeof CI_MANAGERS)[number];
 
-/** The lockfiles read, in the order a folder holding several is refused by; the unsupported ones are named, never ignored. */
-const LOCKFILES: readonly { file: string; manager: PackageManager | undefined }[] = [
-  { file: "package-lock.json", manager: "npm" },
-  { file: "pnpm-lock.yaml", manager: "pnpm" },
-  { file: "yarn.lock", manager: undefined },
-  { file: "bun.lock", manager: undefined },
-  { file: "bun.lockb", manager: undefined },
-];
+function setUp(manager: AnyManager): manager is PackageManager {
+  return (CI_MANAGERS as readonly string[]).includes(manager);
+}
+
+/** Every lockfile Coherence recognizes, named in a refusal in file order; one whose manager the workflow does not set up is named, never ignored. */
+const LOCKS: readonly { file: string; manager: PackageManager | undefined }[] = LOCKFILES.map(([file, manager]) => ({ file, manager: setUp(manager) ? manager : undefined })).sort((a, b) => a.file.localeCompare(b.file));
+/** The lockfiles the workflow installs from, each with its manager. */
+const SET_UP = LOCKS.flatMap((l) => (l.manager === undefined ? [] : [{ file: l.file, manager: l.manager }]));
 
 export class CiError extends Error {}
 
@@ -153,19 +156,19 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   const workdir = slash(relative(top, at));
   let lock: { dir: string; manager: PackageManager } | undefined;
   for (const dir of upTo(at, top)) {
-    const held = LOCKFILES.filter((l) => existsSync(join(dir, l.file)));
+    const held = LOCKS.filter((l) => existsSync(join(dir, l.file)));
     if (held.length === 0) continue;
     if (held.length > 1) throw new CiError(`ci install: ${slash(relative(top, dir))} holds ${held.map((l) => l.file).join(" and ")}; keep the one lockfile the project installs with`);
     const [one] = held;
-    if (one!.manager === undefined) throw new CiError(`ci install: ${slash(relative(top, join(dir, one!.file)))} is a lockfile the workflow does not set up; it installs with npm (package-lock.json) or pnpm (pnpm-lock.yaml)`);
+    if (one!.manager === undefined) throw new CiError(`ci install: ${slash(relative(top, join(dir, one!.file)))} is a lockfile the workflow does not set up; it installs with ${SET_UP.map((l) => `${l.manager} (${l.file})`).join(" or ")}`);
     lock = { dir, manager: one!.manager };
     break;
   }
   if (lock === undefined) {
     throw new CiError(
       registry === undefined
-        ? `ci install: no package-lock.json or pnpm-lock.yaml from ${workdir} up to the repository top; install ${PACKAGE_NAME} as a dev dependency first (npm install -D or pnpm add -D)`
-        : `ci install: no package-lock.json or pnpm-lock.yaml at the repository top, where a registry's check runs; install ${PACKAGE_NAME} as a dev dependency there first`,
+        ? `ci install: no ${SET_UP.map((l) => l.file).join(" or ")} from ${workdir} up to the repository top; install ${PACKAGE_NAME} as a dev dependency first (npm install -D or pnpm add -D)`
+        : `ci install: no ${SET_UP.map((l) => l.file).join(" or ")} at the repository top, where a registry's check runs; install ${PACKAGE_NAME} as a dev dependency there first`,
     );
   }
   // The workflow runs the installed package from where the check runs, as npx --no -- coherence does there.

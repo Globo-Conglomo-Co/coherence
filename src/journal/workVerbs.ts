@@ -2,7 +2,7 @@
  * The work verbs: one command, five subcommands, each an appended record or a read.
  *
  *   work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>] [--cite <id>]...
- *   work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...
+ *   work move <id> <state> --because "<why>" [--cite <id>]...   (state: one of MOVE_STATES)
  *   work close <id> --because "<what was done>" [--cite <id>]...
  *   work owner <id> --owner-session <id> --because "<why>"
  *   work inspect [<id>]
@@ -20,7 +20,7 @@
 
 import { loadRuns, type RunRecord } from "../enforcement/record.ts";
 import { JournalError, onePositional, parseFlags, required } from "./args.ts";
-import { GLYPH, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
+import { GLYPH, MOVE_STATES, alternation, spoken, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove, type WorkRecord } from "./record.ts";
 import { loadJournal } from "./store.ts";
 import { CITE, attribution, citations, head, vetted, withCommon, type Context, type Written } from "./verbs.ts";
 import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./work.ts";
@@ -28,6 +28,12 @@ import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./
 /** What a work verb prints on success; the first line starts with the record id. */
 export interface WorkWritten {
   lines: string[];
+}
+
+/** The one way a work record reaches its store: vetted first, so a record the vet stands against is refused before anything is written. */
+function writeWork(ctx: Context, record: WorkRecord): void {
+  vetted(ctx, record);
+  appendWork(ctx.cwd, record);
 }
 
 function orderOrRefuse(cwd: string, id: string, verb: string): WorkOrder {
@@ -49,8 +55,7 @@ function create(argv: string[], ctx: Context): WorkWritten {
   const boundary = required(parsed, "boundary", "an order names the folders or files its owner may write");
   const owner = parsed.one.get("owner-session") ?? who.session;
   const record: WorkOrderRecord = { ...head("order", who, ctx, objective), objective, success, boundary, owner, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return {
     lines: [
       `${record.id}  work order recorded in ${WORK_DIR}/${record.session}.jsonl; owner ${owner}; state open`,
@@ -66,15 +71,14 @@ function move(argv: string[], ctx: Context): WorkWritten {
   const [id, state, ...rest] = parsed.positionals;
   if (id === undefined || state === undefined) throw new JournalError("work move takes <id> <state>");
   if (rest.length > 0) throw new JournalError(`work move: unexpected argument "${rest[0]}"`);
-  if (!isWorkState(state)) throw new JournalError(`work move: "${state}" is not open, active, waiting, or cancelled`);
+  if (!isWorkState(state)) throw new JournalError(`work move: "${state}" is not ${spoken(MOVE_STATES)}`);
   if (state === "completed") throw new JournalError(`work move: completed is what close records; run: work close ${id} --because "<what was done>"`);
   const because = required(parsed, "because", "a move records why the order moved");
   const order = orderOrRefuse(ctx.cwd, id, "move");
   refuseTerminal(order, "move");
   if (order.state === state) throw new JournalError(`work move: ${id} is already ${state}`);
   const record: WorkMove = { ...head("move", who, ctx, `${id}\n${state}\n${because}`), of: id, state, because, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} ${order.state} -> ${state} recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
@@ -86,8 +90,7 @@ function close(argv: string[], ctx: Context): WorkWritten {
   const order = orderOrRefuse(ctx.cwd, id, "close");
   refuseTerminal(order, "close");
   const record: WorkCompletion = { ...head("completion", who, ctx, `${id}\n${because}`), of: id, state: "completed", because, ...citations(parsed, ctx.cwd) };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} ${order.state} -> completed recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
@@ -101,8 +104,7 @@ function owner(argv: string[], ctx: Context): WorkWritten {
   refuseTerminal(order, "owner");
   if (order.owner === next) throw new JournalError(`work owner: ${id} is already owned by ${next}`);
   const record: WorkOwner = { ...head("owner", who, ctx, `${id}\n${next}\n${because}`), of: id, owner: next, because };
-  vetted(ctx, record);
-  appendWork(ctx.cwd, record);
+  writeWork(ctx, record);
   return { lines: [`${record.id}  ${id} owner ${order.owner} -> ${next} recorded in ${WORK_DIR}/${record.session}.jsonl`] };
 }
 
@@ -221,7 +223,7 @@ export function work(argv: string[], ctx: Context): Written | WorkWritten {
 export const WORK_USAGE = [
   "work orders (writes need --session <id> --agent <name>; binding to journal writes and runs is inferred from sole active ownership):",
   '  work create "<objective>" --success "<observable criterion>" --boundary "<folders or files the owner may write>" [--owner-session <id>] [--cite <id>]...',
-  '  work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...',
+  `  work move <id> <${alternation(MOVE_STATES)}> --because "<why>" [--cite <id>]...`,
   '  work close <id> --because "<what was done>" [--cite <id>]...',
   '  work owner <id> --owner-session <id> --because "<why>"',
   "  work inspect [<id>]",

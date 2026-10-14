@@ -1,0 +1,2499 @@
+{
+ "about": "Every bullet main enforced by a totality oracle alone on 2026-10-12, by shape. A door is a bullet whose truth rests on nobody reaching a thing except through one place; only a door is chokepoint material, and only where the thing is a project symbol a reference can name. Shapes other than door were assigned by reading the sentence; the why of a behaviour or text row is generic unless the row was read against the code.",
+ "bullets": 397,
+ "counts": {
+  "behaviour": 305,
+  "text": 38,
+  "derivation": 19,
+  "door": 26,
+  "other": 9
+ },
+ "doors": {
+  "chokepoint not added": 17,
+  "chokepoint added": 6,
+  "held by an existing chokepoint": 3
+ },
+ "rows": [
+  {
+   "component": "Coherence",
+   "name": "commands act on the project root",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Coherence",
+   "name": "grammar carries no rejected name",
+   "shape": "text",
+   "why": "what a spec in the grammar says"
+  },
+  {
+   "component": "Coherence",
+   "name": "a structural defect was an invariant",
+   "shape": "derivation",
+   "why": "the state is derived from the bullet and the latest run"
+  },
+  {
+   "component": "Adapters",
+   "name": "current text before any question",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "every site is a reference",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "test paths",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "package files are inside the package",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "whole workspace indexed",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "packages found by the resolver",
+   "shape": "door",
+   "why": "every installed package is found through installed.ts",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the raw capability is node's resolver or a hand-built path string, neither a project symbol"
+  },
+  {
+   "component": "Adapters",
+   "name": "a pnpm project on TypeScript 7 reads with Coherence's own",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "the project's own install comes first",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "only the project's files",
+   "shape": "door",
+   "why": "every walk and every reported reference passes the project-files functions",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the bypass is a copy (a module spawning its own git ls-files), not a reference to a symbol; it needs the git door first"
+  },
+  {
+   "component": "Adapters",
+   "name": "a folder is left out only by a named rule",
+   "shape": "door",
+   "why": "a folder is left out only by exclusionOf",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the bypass is a copy (a walker comparing a folder name), not a reference"
+  },
+  {
+   "component": "Adapters",
+   "name": "the ignore list names a file by its path",
+   "shape": "door",
+   "why": "every reader of the ignore list applies underIgnored and exclusionOf",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "a must-use rule: the bypass is a reader that never calls it, which no reference shows"
+  },
+  {
+   "component": "Adapters",
+   "name": "entrance detection follows listed rules",
+   "shape": "derivation",
+   "why": "the detected entrances come from the listed rules"
+  },
+  {
+   "component": "Adapters",
+   "name": "the request proxy is an entrance",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a route file's export list names its methods",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a page route is an entrance",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a listing answers as git does",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "the adapter's listing lasts until forget",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "the Python adapter's listing lasts until forget",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a cold server resolves what the project declares",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "the adapter's git spawns do not grow with the names asked",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a nested Python project resolves imports from the repository top",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "a registry leaf inherits key by key",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "Python stages a use from outside an exempted folder",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "tach configuration read as tach reads it",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "tach draws the module boundary",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "tach's refusal is the refutation",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "tach absent is a reason",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Adapters",
+   "name": "tach at an edit spawns only for a tach module's file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "reach by either enforcement",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "economy is deterministic",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "mass reports unreached first",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "mass names folders with no spec of their own",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "working change is the project's change",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "removal keeps its dependents",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "a stop predicts for the session's own writes",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "the prediction resolves only what a given file could define",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Economy",
+   "name": "mass counts every language",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "session names the run file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "sites classified",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "both endpoint sites recorded honestly",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "grade ladder",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "refutation proves this check would fire",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "not configured never passes",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a report entry maps by exact title",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "each alone after the batch",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "the instrument outlives the test pass",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "one warm server per root",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a dead owner's lock is reclaimed",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "serve never takes a held root",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a warm server never answers with stale code",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a server ends with its root",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "socket clients are authenticated",
+   "shape": "door",
+   "why": "every request line carries the token; the client side is LineClient",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the raw capability is net.createConnection (a builtin) and connectOnce is already module-private; a chokepoint would restate visibility"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a client request times out",
+   "shape": "door",
+   "why": "every request goes through LineClient.request, which times out",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "as above"
+  },
+  {
+   "component": "Enforcement",
+   "name": "HTTP is loopback, tokened and same-origin",
+   "shape": "door",
+   "why": "every HTTP request passes admitHttp in the one listener",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the raw capability is node:http's createServer, a builtin"
+  },
+  {
+   "component": "Enforcement",
+   "name": "HTTP requests time out",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a run keeps each test's own time",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a test is slower only against its own history",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a nested verdict names its horizon",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "the reference horizon widens the search",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a single-language config reads as it always did",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a multi-language config is read whole or refused by name",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "each test runs through its own setup",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "each chokepoint is graded by its own language's server",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a chokepoint governs what its from line names",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a silent bullet takes the config default",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "the test suite leaves no process or temp folder behind",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "unchanged sites are written once per run file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a run's sites read the same by reference",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "an append asks the sites shard, never its run file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "run at a registry's top runs each listed project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Enforcement",
+   "name": "a run's named invariants all name bullets",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a citation reaches another branch",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a flag's value from a file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a record is vetted before it is written",
+   "shape": "door",
+   "why": "a record must be vetted before any write; journal records already pass write in verbs.ts (attributed writes), and work records now pass writeWork, which vets, so appendWork must be reached only there",
+   "protects": "appendWork",
+   "chokepoint": "writeWork",
+   "status": "chokepoint added",
+   "refactor": "writeWork in workVerbs.ts: the four work verbs each called vetted then appendWork by convention; they now call writeWork"
+  },
+  {
+   "component": "Journal",
+   "name": "escalation heads every read",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "damaged lines reported",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "pointing never edits",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "binding inferred from sole ownership",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "terminal orders never move",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "citations resolve at the write",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "citations read both ways",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "human words kept apart",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "an enactment answers every step",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "an enactment waits for the amendment",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a defect carries its class and origin",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a shallow clone refuses only an introduced commit it can tell is none",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a defect is classified by a later record, never edited",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "a defect's close names a guard or a decision",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "close a defect fires on a defect's close",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "the convergence reading never infers",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Journal",
+   "name": "the record stores are named once",
+   "shape": "derivation",
+   "why": "named once in stores.ts and derived everywhere; a second spelling of a folder is a copy, which no reference shows"
+  },
+  {
+   "component": "Journal",
+   "name": "a record field's role is declared once",
+   "shape": "derivation",
+   "why": "declared once in RECORD_ROLES"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a subagent is told its own session",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a proposal prints as a reader needs it",
+   "shape": "text",
+   "why": "what lexicon propose prints"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a dropped lexicon key stays on record",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a property drop counts its findings before apply",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "lexicon provenance is append-only",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a lifted rejection cites the decision that made it",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "no project lexicon before a project makes one",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an outside entry file is named as outside",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "compact injection",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "injection within budget",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "rejected names refused",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "both layers reach identifiers",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the corpus is every text kind",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the corpus stays inside the root",
+   "shape": "door",
+   "why": "every path the check is given is confined by collectFiles",
+   "protects": "collectFiles",
+   "chokepoint": "readCorpus",
+   "status": "held by an existing chokepoint",
+   "held": "Lifecycle/the corpus is read only through readCorpus"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an unreadable path never aborts the check",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "project sense wins",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "Coherence's rejected names bind only in Coherence's own text",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a project's claim wins inside it",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the baseline only shrinks",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the check's unknown nouns are coverage's names",
+   "shape": "derivation",
+   "why": "the check and coverage share one rule"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an unknown noun never refuses",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a recorded wall makes the debt advisory",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a git failure is not a clean tree",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the stop snapshot has an instrument",
+   "shape": "door",
+   "why": "the stop snapshot reaches the instrument through enforcement's one door",
+   "protects": "connectAdapter",
+   "chokepoint": "withWarmAdapters",
+   "status": "held by an existing chokepoint",
+   "held": "Enforcement/warm server the only path"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "escalation heads the start",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "escalation names what it cites",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "revelation at the edit",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "uninstall keeps other hooks",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "install keeps regenerated state out of git",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "record stores merge by union",
+   "shape": "derivation",
+   "why": "the union merge attributes derive from the store table"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "record readers tolerate what a union merge keeps",
+   "shape": "door",
+   "why": "every store append passes appendWhole, which ends a torn line first",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the bypass is appendFileSync on a store file, a builtin; the store folders are named in stores.ts, which is meant to be read everywhere"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "every session start keeps the attributes file",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an upgraded adopter's first session start writes the attributes",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "check fails on any drift",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a hook without Coherence tells the agent how to supply it",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a located Coherence answers as a direct command does",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the installed package wins over a checkout beside the project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "hooks an earlier release wrote are named for reinstall",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "Coherence's own repository runs its own source",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a developer points an adopter at a local checkout",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "hooks install names the copy the hooks reach",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the session start names the Coherence that runs",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a newer release is named with its update command",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the update check adds no wait to a hook",
+   "shape": "door",
+   "why": "the registry may be asked only in the detached version --refresh child; refreshLatest is the one function that asks it, so every reference to it must sit in the version verb",
+   "protects": "refreshLatest",
+   "chokepoint": "versionCommand",
+   "status": "chokepoint added"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a failed update check keeps the last answer",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an answer older than the running release is not the latest",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the version and help flags answer at the top level",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the README's version floor is the current release",
+   "shape": "text",
+   "why": "what the README's prompts say"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "feed injects subjects only",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "feed carries two kinds",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "another agent under the session is a peer",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a stopped subagent returns what it recorded",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "cursor advances after the print",
+   "shape": "door",
+   "why": "the cursor may move only through the commit the feed hands back; writeCursor is the write, so every reference to it must sit in the feed module that builds the commit",
+   "protects": "writeCursor",
+   "chokepoint": "src/journal/feed.ts",
+   "status": "chokepoint added"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the order rides with orient and regulate",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "candidates come from names",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "well-known names need no definition",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the retired lexicon file is refused with its migration",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "rulings recorded under the retired verb still count",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "sense review only where meaning is at risk",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an adopter's code names its own sense",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a declared name's ruling outlives new uses",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "no totals are injected",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "regulate names the terms the session made recur",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a held term reaches the next prompt",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "coverage honors the config's bounds",
+   "shape": "door",
+   "why": "the vocabulary corpus applies underIgnored",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "a must-use rule, as above"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the project's name is the config's",
+   "shape": "door",
+   "why": "the project's name has one source, projectName",
+   "protects": "configuredName",
+   "chokepoint": "projectName",
+   "status": "chokepoint not added",
+   "skipped": "configuredName has readers outside projectName (model.ts compares the stored and configured names by design, build.ts and project.ts read it); a door needs a refactor of those readers in areas other work is changing"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "lexicon setup reads only the paths it is given",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "function words are never candidates",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names spec gaps",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names the last reading's gaps when it is stale",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a session's stop refreshes the structure reading",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a spec gap never refuses a stop",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names undeclared entrances",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an undeclared entrance never refuses a stop",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the project's hook voice composes over what each event says",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a hook voice file stays inside the root",
+   "shape": "door",
+   "why": "a hook voice file is read only after its real path is confined to the root; voiceFile is the one reader, so the voice folder's name must be reached only there",
+   "protects": "HOOK_VOICE_DIR",
+   "chokepoint": "voiceFile",
+   "status": "chokepoint added"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a fired practice is delivered before the act",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a fired practice not enacted is owed",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a shell command's writes are read from its words",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a shell write is an edit",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a tool that only reads is never a write",
+   "shape": "derivation",
+   "why": "derived from host-tools.ts's declaration"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "every tool that writes is matched and read",
+   "shape": "derivation",
+   "why": "derived from host-tools.ts's declaration"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the read trace records only declared reading tools",
+   "shape": "derivation",
+   "why": "derived from host-tools.ts's declaration"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a narrow PreToolUse matcher is named for reinstall",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a turn's instrument is warmed before its stop",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "regulate reports the prediction",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "practice delivery reads the practices light",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a tool call's hooks spawn git a fixed number of times",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit never stays silent about a check it could not make",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a tool hook over the latency budget says so",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a stop reaches the agent",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a practice fires where its command runs",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the coverage reading runs only when the text can have moved",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a hook at the repository top answers for the nested project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an event outside every project is ignored",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "git paths are relative to the project root",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a command at the repository top acts on the nested project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "install from a nested project reaches where the host reads",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient waits for the project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a personal install stays out of the committed settings",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a registry routes events by its list",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an event outside every leaf costs no git",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "adopt opts a folder in",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "install with a registry writes once at the top",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "entering a nested project warms its instrument",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a tool use that writes nothing pays only for its own budget at any size",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit pays for the files it names and its budget at any size",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an event outside every project costs a constant",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a prompt over an unchanged tree reads no corpus",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the coverage scan compares a line with its own words' phrases",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "every spawn is counted at runtime",
+   "shape": "door",
+   "why": "every spawn passes node's child_process module, patched once at load; the door is the builtin module itself",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "the protected thing is a builtin, not a project symbol"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the work meter sees every git a hook spawns",
+   "shape": "door",
+   "why": "every git a hook spawns passes the work meter; the meter is node's child_process patched at load, a runtime door",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "same runtime door as the pathspec bullet; a reference check sees no symbol"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit is checked against the spec as it is",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit's chokepoint check never goes silent because a cache cannot be used",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the run index answers as the run history does",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the peer feed reads only what changed since its last look",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit whose kept vocabulary cannot be used reads in full and says so",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the kept vocabulary holds what the full reading holds",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "nested work scopes add up",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an upgrade turns no kernel practice against an adopter",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a project behind a symbolic link hears its hooks",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names each guard failure",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names Coherence's own TypeScript",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a hook time carries its version",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "orient names a floor no full run moved",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "telemetry is sent only on opt-in",
+   "shape": "door",
+   "why": "nothing leaves unless the user opted in; FETCH_SENDER is the one function that reaches the network and flushQueue checks the opt-in before it sends, so every reference to it must sit in flushQueue",
+   "protects": "FETCH_SENDER",
+   "chokepoint": "flushQueue",
+   "status": "chokepoint added"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a telemetry event carries only its schema's fields",
+   "shape": "door",
+   "why": "every queued line must pass enqueue's schema check; the queue's path could be kept inside telemetry.ts so no other module writes the queue",
+   "protects": "queuePath",
+   "chokepoint": "src/lifecycle/telemetry.ts",
+   "status": "chokepoint not added",
+   "skipped": "graded and its bypass witnessed, then dropped: it cost about 0.7 s on every edit of telemetry.ts (the file is the chokepoint), it needed a refactor of the status line, and it guards the file path rather than the append; demoted by decision"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a defect's telemetry carries no defect text",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "telemetry adds no wait to a hook",
+   "shape": "door",
+   "why": "the send must happen only in the detached flush; flushQueue is the send, so every reference to it must sit in the telemetry verb the detached child runs",
+   "protects": "flushQueue",
+   "chokepoint": "telemetryCommand",
+   "status": "chokepoint added"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "git calls ignore how the environment reads pathspecs",
+   "shape": "door",
+   "why": "every git spawn must run without the pathspec variables; the door exists at runtime (controlled() in the work meter's patch of child_process), which no reference check can see",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "a static door needs one git() helper; git is spawned at about 25 sites in 15 files, a refactor beyond small, and the runtime patch is already total"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an empty spec listing is a failure, not an answer",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a damaged kept vocabulary is never read as empty",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a write no hook saw is read in full at the next edit",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "counting a spawn changes nothing it returns",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the size counts weigh every read and class every spawn",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a moved HEAD is a moved tree",
+   "shape": "door",
+   "why": "HEAD is read through the git door",
+   "protects": null,
+   "chokepoint": null,
+   "status": "chokepoint not added",
+   "skipped": "same runtime git door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "an edit's check asks the language the last run graded in",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the status line reads the session's own records",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a status line render loads no hook module",
+   "shape": "other",
+   "why": "an import-closure property of the status line (built-ins only), not references to one symbol"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the status line keeps the user's own",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the status line links Scope while it is served",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the CI check's fail mode fails on problems and defects",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the CI check's comment mode fails only when Coherence breaks",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "a registry's CI check covers every listed project",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "ci install refuses what it cannot set up",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "ci install never overwrites a workflow",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "hooks install offers the CI check while none runs",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the CI report carries every finding and fails only on an unfinished run",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the warm hook process answers as the hook does",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the warm hook process never answers from stale code",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the warm hook process leaves with its socket",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the mod is Coherence's own",
+   "shape": "derivation",
+   "why": "the mod's tools are generated from host-tools.ts"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the mod installs for one person from Coherence's repository",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the mod can be the team's",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Lifecycle",
+   "name": "the mod keeps Coherence's own files",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Observation",
+   "name": "stale never current",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Observation",
+   "name": "one runner invocation",
+   "shape": "door",
+   "why": "observation never invokes the runner a second time",
+   "protects": "runTotalityBatch",
+   "chokepoint": "performRun",
+   "status": "held by an existing chokepoint",
+   "held": "Enforcement/one invocation for every test"
+  },
+  {
+   "component": "Observation",
+   "name": "co-executed never called",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Observation",
+   "name": "breakage kept apart",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Observation",
+   "name": "attribution never fabricated",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Observation",
+   "name": "observation names the languages it did not read",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "no stored derivation",
+   "shape": "derivation",
+   "why": "nothing derived is stored"
+  },
+  {
+   "component": "Scope",
+   "name": "reliance comes from complete endpoint sites",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "bounded first load",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "an older run carries only what it holds",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "self-contained snapshot",
+   "shape": "text",
+   "why": "what a snapshot's bytes hold"
+  },
+  {
+   "component": "Scope",
+   "name": "embedded state unchanged",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "provenance one click away",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "render from state",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "views render from state",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "defects show both options",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "deep links resolve",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "second root",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "structure draws every component interface",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "component interfaces reveal their invariants",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "structure positions are stable",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "one selection answers each reviewer question",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "structure flow and query structure share one derivation",
+   "shape": "derivation",
+   "why": "one derivation, flowOf, for both readers"
+  },
+  {
+   "component": "Scope",
+   "name": "structure text never collides",
+   "shape": "other",
+   "why": "a geometric property of the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "structure segments are octilinear",
+   "shape": "other",
+   "why": "a geometric property of the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "a core dependency draws no caller arrow",
+   "shape": "other",
+   "why": "a geometric property of the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "each structural route is one colored path",
+   "shape": "other",
+   "why": "a geometric property of the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "structure preview is ephemeral evidence",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "ambiguous property meanings stay plural",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "structure health is on the map",
+   "shape": "derivation",
+   "why": "the strip's counts are the spec model's"
+  },
+  {
+   "component": "Scope",
+   "name": "identifiers carry their state",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "broken marks are attached and list their sites",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "every crossing is drawn",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a trust level always lights",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "routes split by trust",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "routes follow the handler",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "interfaces read only within the declared components",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the prefilter never hides a cross-component reference",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "the interface reading is bounded in time and says when it is partial",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "origin tokens stay readable",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "token text clears its real fill",
+   "shape": "other",
+   "why": "a contrast ratio of the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "the trust tag sits outside its token",
+   "shape": "other",
+   "why": "a placement on the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "origin tokens point into the system and stack by entrance count",
+   "shape": "other",
+   "why": "a placement on the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "the map opens on the whole system",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "one verdict per invariant",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "red means broken",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the masthead leads with health",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "trust shows where work enters",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "declared trust wins",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "derived trust is labeled",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "no traced control marks only the untrusted",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "controls are traced four ways",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a test-backed control is the entrance's own",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "an invariant covers the entrances it names",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "crossing alone covers no entrance and says so",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Scope",
+   "name": "the reading traces what a handler passes",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "a registry entry is its declaration's use",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "entrance coverage is one derivation",
+   "shape": "derivation",
+   "why": "one derivation, coverageOf"
+  },
+  {
+   "component": "Scope",
+   "name": "a component selection shows direction",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the unenforced is visible",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "each identifier is drawn once",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "roles are never cut mid-phrase",
+   "shape": "other",
+   "why": "a placement on the drawn map"
+  },
+  {
+   "component": "Scope",
+   "name": "motion runs caller to callee while selected",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the lexicon leads with the signal",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the project's vocabulary comes first",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "citations linked in the Journal view",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the window keeps what is cited",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "live updates reach a connected page",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "every file the model reads refreshes the live reading",
+   "shape": "derivation",
+   "why": "the watched files are those the model reads"
+  },
+  {
+   "component": "Scope",
+   "name": "reconnect resumes from its cursors",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "the masthead does not move between views",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "Structure is the first view",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "control none is never marked",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "declared guards split routes",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "recorded reading stands only for its tree",
+   "shape": "door",
+   "why": "reading.json is written only by recordReading, which keeps only a complete reading of the tree as it is",
+   "protects": "readingPath",
+   "chokepoint": "recordReading",
+   "status": "chokepoint not added",
+   "skipped": "readingPath is module-private and also used by lastReading; a chokepoint would restate visibility"
+  },
+  {
+   "component": "Scope",
+   "name": "one structure refresh at a time",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "a session start waits only for a nearly done refresh",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Scope",
+   "name": "gap baseline only shrinks",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "orient's gap line is bounded",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a snapshot never defaults into a served folder",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "the practices view tells what exists first",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a strip shows each enactment's outcome for its step",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a citation's kind comes from the minter's tables",
+   "shape": "derivation",
+   "why": "read off the minter's tables"
+  },
+  {
+   "component": "Scope",
+   "name": "the window keeps what practices need",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "a scoped reading proposes what the whole reading proposes",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scope",
+   "name": "a scoped reading is never recorded",
+   "shape": "door",
+   "why": "a scoped reading is refused by recordReading, the one writer",
+   "protects": "readingPath",
+   "chokepoint": "recordReading",
+   "status": "chokepoint not added",
+   "skipped": "as above"
+  },
+  {
+   "component": "Scope",
+   "name": "a spec edit rereads no source",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "a source edit rereads only what it touches",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "kept answers are never used silently",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "the kept answers rest on all the adapters' code",
+   "shape": "derivation",
+   "why": "the basis is derived from the adapters' import closure"
+  },
+  {
+   "component": "Scope",
+   "name": "which references governed is shown",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "every reading names the languages it did not read",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "the Structure reading reads every language",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "a language's server starts only when read",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "entrance detection reads every language",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "one language reads as before",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scope",
+   "name": "the page's bundle is what its entry imports",
+   "shape": "derivation",
+   "why": "the bundle is derived from the entry's imports"
+  },
+  {
+   "component": "Scope",
+   "name": "a page that cannot draw says so",
+   "shape": "behaviour",
+   "why": "what the page renders for the state it is given; a test builds the states"
+  },
+  {
+   "component": "Scaffold",
+   "name": "written bullet parses as a requirement",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "no overwrite",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "preview is a proposal, not evidence",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a gap's closure is proposed",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a lost control is named back",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a closure is written only where safe",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "scaffold control reads the recorded reading",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "undeclared entrances are proposed in the spec grammar",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a Next.js app's entrances are proposed and resolve",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "scaffold control reads only what a named request needs",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a boundary draft follows its declaration",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a boundary draft never overwrites",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "a boundary draft refuses what it cannot read",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Scaffold",
+   "name": "scaffold control reads every language",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "refutation is a recorded event",
+   "shape": "derivation",
+   "why": "a refutation's state is derived from the run store"
+  },
+  {
+   "component": "Spec",
+   "name": "placeholders count as absent",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a refuted line parses in linear time",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "half a form is a problem",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "trust levels in the entry spec only",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "one spec per folder",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "entrance trust names a declared level",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "declared trust agrees with the handler's crossing",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a module handler exists",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an ignore entry that names nothing is a problem",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an ignore entry git ignores is no problem",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a stored project name that disagrees with the config is a note",
+   "shape": "text",
+   "why": "what a reader or the agent is told; the wording is checked by the test that builds the case"
+  },
+  {
+   "component": "Spec",
+   "name": "a module handler may carry route segments",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a re-exported or destructured handler is declared",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an entrance guard names a chokepoint",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "control none carries its reason",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an invariant names the entrances it covers",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a control lost to the crossing alone is named",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a practice is paired with its spec",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an enacted practice keeps what it taught",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a practice rests on evidence that exists",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a shallow clone leaves a cited commit unchecked",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a leaves line belongs to the step above it",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a command trigger matches its words in place",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a trigger that names no file is a problem",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "the dead-trigger check pays for its triggers",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a dead trigger is looked for outside its leaf as narrowly",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "kernel practices reach adopters",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "every Coherence practice declares its reach",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a config the registry does not list is a problem",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "from and owners lines are declared and checked",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a kernel practice's floor is Coherence's",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "an invariant is not demoted silently",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "the defect floor names closes and repeats",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  },
+  {
+   "component": "Spec",
+   "name": "a family's guard answers only for its own defect",
+   "shape": "behaviour",
+   "why": "what the code does for the cases its test builds; its truth does not rest on one symbol being reached through one door"
+  }
+ ]
+}

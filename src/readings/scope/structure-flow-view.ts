@@ -42,10 +42,10 @@
  */
 
 import { componentId, invariantId, latestOf, plural, relianceOf, type RelianceSite } from "./derive.ts";
-import { CANDIDATE_RULES, NOT_DETECTED, groupLine } from "./entrance-coverage.ts";
+import { candidateRulesOf, groupLine, notDetectedOf } from "./entrance-coverage.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import { renderEnforcement, renderRefutation } from "./invariants-view.ts";
-import type { ShellState, StructurePreview } from "./model.ts";
+import type { LatestEntry, ShellState, StructurePreview } from "./model.ts";
 import {
   CONTROL_WORDS,
   CORE_RULE,
@@ -1918,6 +1918,21 @@ function invariantRow(model: FlowModel, ref: FlowInvariantRef, where = false): M
   return html`<li class="flow-row" data-invariant="${ref.name}" data-verdict-state="${ref.verdict.state}">${lead}${pick}<span class="flow-meta">${verdictMark(ref)}${where ? html` · ${ref.component === "." ? "the root" : ref.component}` : null}</span></li>`;
 }
 
+/**
+ * The sites the page's window counted and did not list, said with where they
+ * are: the live page loads them from its server, and a snapshot names the
+ * query that lists every one.
+ */
+function renderSitesLeft(state: ShellState, entry: LatestEntry, chokepoint: string, left: number): Markup {
+  const by = new Map<string, number>();
+  for (const tally of entry.sitesLeft ?? []) by.set(tally.component ?? "", (by.get(tally.component ?? "") ?? 0) + tally.count);
+  const where = [...by.entries()].map(([folder, count]) => `${count} in ${folder === "" ? "no declared component" : folder === "." ? "the root" : folder}`).join(", ");
+  const said = `${plural(left, "more site is", "more sites are")} counted and not listed (${where})`;
+  return state.connection?.mode === "live"
+    ? html`<p class="flow-note" data-field="sites-left" data-left="${left}">${said}. <button type="button" class="history-load" data-load-sites="${entry.at}~${entry.session}" data-component="${entry.component}" data-name="${entry.name}">Load the other ${left}</button></p>`
+    : html`<p class="flow-note" data-field="sites-left" data-left="${left}">${said}: <code>query relies-on ${chokepoint}</code> lists every one, from the run under <code>.coherence/runs</code>.</p>`;
+}
+
 function flowSite(site: RelianceSite): Markup {
   const role = site.target === "protected" && site.siteClass === "bypass"
     ? "protected thing · bypass (not a legal chokepoint reference)"
@@ -2070,12 +2085,12 @@ function renderCoverage(model: FlowModel): Markup {
   const covered = coverage.individually + coverage.grouped;
   // Each language read, by its own rules.
   const languages = model.languages?.read ?? [model.language ?? ""];
-  const rules = languages.flatMap((language) => CANDIDATE_RULES[language] ?? []);
+  const rules = languages.flatMap((language) => candidateRulesOf(language));
   return html`<details class="flow-coverage" data-field="entrance-coverage" data-detected="${String(coverage.detected)}" data-covered="${String(covered)}" data-undeclared="${String(coverage.uncovered.length)}">
     <summary><span class="flow-coverage-title">Entrances</span> ${String(coverage.declared)} declared, covering ${String(covered)} of ${plural(coverage.detected, "detected entrance", "detected entrances")}${coverage.groups.length === 0 ? "" : `, ${coverage.grouped} of them through ${plural(coverage.groups.length, "grouped entrance", "grouped entrances")}`}; <span class="${coverage.uncovered.length === 0 ? "flow-meta" : "flow-attention"}" data-field="undeclared">${String(coverage.uncovered.length)} undeclared</span></summary>
     ${coverage.groups.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-groups">${coverage.groups.map((g) => html`<li class="flow-row" data-entrance="${g.name}" data-covers="${String(g.covers)}"><span>${groupLine(g)}</span></li>`)}</ul>`}
     ${coverage.uncovered.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-undeclared">${coverage.uncovered.map((c) => html`<li class="flow-row" data-rule="${c.rule}"><code>${c.file}:${String(c.line)}</code>${c.symbol === "" ? null : html` <span>${c.symbol}</span>`}<span class="flow-meta">${c.rule}: ${c.why}</span></li>`)}</ul>`}
-    <p class="flow-meta" data-field="coverage-rules">${coverage.beyond === 0 ? "" : `${plural(coverage.beyond, "declared entrance covers", "declared entrances cover")} nothing detected: declared where the rules do not reach, or finer than they detect. `}Detected by ${rules.length === 0 ? "no rule for this language" : rules.map((r) => r.rule).join(", ")}; ${languages.map((l) => NOT_DETECTED[l] ?? "").filter((t) => t !== "").join("; ")}.</p>
+    <p class="flow-meta" data-field="coverage-rules">${coverage.beyond === 0 ? "" : `${plural(coverage.beyond, "declared entrance covers", "declared entrances cover")} nothing detected: declared where the rules do not reach, or finer than they detect. `}Detected by ${rules.length === 0 ? "no rule for this language" : rules.map((r) => r.rule).join(", ")}; ${languages.map((l) => notDetectedOf(l) ?? "").filter((t) => t !== "").join("; ")}.</p>
   </details>`;
 }
 
@@ -2346,9 +2361,9 @@ function renderChokepointInspector(state: ShellState, model: FlowModel, chokepoi
     <details class="flow-more flow-reliance flow-agent"><summary>${termLink(state, "reliance", "Reliance")}: the recorded reference sites</summary>
     ${join(reliance.map((r) => r.evidence.status === "unknown"
       ? html`<p class="flow-note" data-reliance="unknown">${r.evidence.reason}</p>`
-      : r.evidence.sites.length === 0
+      : r.evidence.sites.length === 0 && r.evidence.left === 0
         ? html`<p class="flow-note" data-reliance="complete">Complete run site evidence records 0 references to the chokepoint or protected thing.</p>`
-        : html`<p class="flow-note" data-reliance="complete">${plural(r.evidence.sites.length, "recorded reference site", "recorded reference sites")} to the chokepoint or protected thing; owner component first.</p><ul class="site-list">${r.evidence.sites.map(flowSite)}</ul>`))}
+        : html`<p class="flow-note" data-reliance="complete">${plural(r.evidence.sites.length + r.evidence.left, "recorded reference site", "recorded reference sites")} to the chokepoint or protected thing; owner component first.${r.evidence.left === 0 ? "" : ` This page lists ${r.evidence.sites.length} of them.`}</p>${r.evidence.left === 0 || r.entry === undefined ? null : renderSitesLeft(state, r.entry, r.chokepoint, r.evidence.left)}<ul class="site-list">${r.evidence.sites.map(flowSite)}</ul>`))}
     </details>
     ${invariant !== undefined && invariant.state === "structural defect" && bypasses.length === 0 ? renderFlowOptions(chokepoint.component, chokepoint.name, [chokepoint.chokepoint]) : null}
   </div>`;

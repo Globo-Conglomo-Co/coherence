@@ -16,9 +16,11 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   crossing: project-source -> record
   kinds: none
 - a record is vetted before it is written: A journal or work record whose own words use a name the lexicon rejects where it binds is refused before anything reaches the store, naming each name and what it was rejected for; a name a decision's over turns away is the record doing its job and passes.
+  protects: appendWork
+  chokepoint: writeWork
   over: a decision and a work order carrying a rejected name, and a decision naming the same name in its over, through the verb table and through the command line
   via: a record the vet stands against is refused before anything is written
-  because: the store is append-only, so a rejected name found after a write costs a retraction and a second record; one session paid that twice, for a word the lexicon had refused all along
+  because: the store is append-only, so a rejected name found after a write costs a retraction and a second record; one session paid that twice, for a word the lexicon had refused all along; a work record reaches its store only through writeWork, which vets first, as a journal record reaches it only through write
   crossing: project-source -> record
   kinds: none
 - append-only store: A journal file is only appended: a second write never changes the first line, and no path rewrites or deletes a record.
@@ -238,4 +240,24 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   because: whether discoveries repay is a trend no single record shows; a reading that guessed an old record's origin or version would report the convergence it was built to measure rather than the one the records hold
   crossing: record -> reading
   refuted: made originOf read a defect with no introduced as fix-induced instead of unknown -> "query convergence counts arrivals by origin and catch, escapes per release, closes and repeats, bullets at each tag and hook latency per version, and says unknown wherever a record does not say" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- the record stores are named once: Each record store and its folder under .coherence is named once, in journal/stores.ts; every module that reads or writes a store takes its folder from there, and the folders a project commits, the union merge each store's files take, the stores Scope live follows, the stores the vocabulary check reads as words, and the CI records summary all derive from that table, so no module names a store's folder again.
+  over: every store in the table, against the .coherence ignore file's kept folders, the attributes lines, Scope live's store matching, the prose folders the check reads, and the records summary run on a repository holding a record in each store; and every source module and CI script, scanned for a store's folder written as a path, a pair of folders listed together, or an alternation of them
+  via: every record store is committed, merged by union, followed live, read for words when it holds prose, and summarized from the one table, and no module names a store's folder again
+  because: RECORD_STORES named journal, runs and work beside the folders each store module, Scope live and the records summary declared for themselves, so a store added or renamed and left out of it would never be committed, would get no union merge and no live refresh, and nothing would fail (df-7bbcdfc5)
+  crossing: project-source -> record
+  refuted: gave project.ts its own list of the record stores again, RECORD_STORES = ["journal", "runs", "work"] in place of the table's folders -> "every record store is committed, merged by union, followed live, read for words when it holds prose, and summarized from the one table, and no module names a store's folder again" went red in stores.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- a record field's role is declared once: Whether each field of each journal and work record is the writer's prose, a quoted refusal, or bookkeeping is declared once, in RECORD_ROLES beside the record types, keyed by each type's own fields so a field without a role fails to compile; the vocabulary check reads the prose and lexicon coverage the prose and the quoted, both through recordWords, and a field no type declares is read as prose.
+  over: a record of every kind in both stores holding a distinct string in every field its type declares, nested lists, maps and objects included, and one field no type declares, read by the check and by coverage; an enactment's outcomes and a close's verdicts
+  via: both readers of a record's words read every field by the role its record type declares, and a field no type declares as prose
+  because: the check and coverage each kept a set of bookkeeping field names, and the two disagreed on eleven of them while neither named cites, so the check never read an enactment step's evidence and coverage never read a defect's evidence (df-baa1d2fa); a set keyed by field name could not give a close's results and an enactment's results their two roles
+  crossing: record -> reading
+  refuted: gave lexicon coverage its own list of bookkeeping fields again, skipping evidence wherever it appears ahead of the role tables -> "both readers of a record's words read every field by the role its record type declares, and a field no type declares as prose" went red in record-roles.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- a closed vocabulary is declared once: Each closed list the journal and work verbs take (what caught a defect, an experiment step's results, the states work move takes, the journal's kinds, and the id prefixes the minter gives each kind) is declared once, in the record model or the minter's tables; the verbs' checks and refusals, their help, fleet telemetry's catches and the record id pattern practices cite by derive from it, and the docs, the spec's prose and the lexicon's definitions that enumerate one are held equal to it.
+  over: every closed list against the verbs' help, docs/journal.md, this spec's prose and the lexicon's definitions; telemetry's catches; an id of every journal and work kind, and one of no kind; and every source module and CI script, scanned for one of the lists written out as an array, a literal union or an alternation
+  via: every closed list the journal verbs take is read from the record model, and every help line, doc and definition that enumerates one names exactly its members
+  because: the catches were written out in the record model, telemetry, the help twice, the docs twice, this spec and the lexicon; the step results in the union, the verb's own list, its template and refusals, the help, the docs and Scope's model; the work states work move takes in its help and refusal; and the id prefixes in a regular expression of their own, so a value added to one place would be refused, unsent, undocumented or never cited, and nothing would fail
+  refuted: wrote the states work move takes out by hand again in its help, the literal open|active|waiting|cancelled in place of MOVE_STATES -> "every closed list the journal verbs take is read from the record model, and every help line, doc and definition that enumerates one names exactly its members" went red in vocabularies.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
   kinds: none

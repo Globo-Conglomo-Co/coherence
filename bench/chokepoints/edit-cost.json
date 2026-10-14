@@ -1,0 +1,518 @@
+{
+ "about": "Wall time of one PostToolUse hook for an Edit of each file, through the CLI with the warm server up, alternating the specs as origin/main has them (before) and with the new chokepoints (after); times in ms. The machine ran other agents (load average 3 to 20), so the least time is the steadier figure. edit-cost.mjs produced each set.",
+ "final": {
+  "rounds": 9,
+  "chokepoints added": 6,
+  "files": {
+   "src/lifecycle/well-known.ts": {
+    "before": {
+     "median": 256,
+     "min": 250,
+     "times": [
+      252,
+      250,
+      251,
+      267,
+      258,
+      256,
+      273,
+      254,
+      257
+     ]
+    },
+    "after": {
+     "median": 252,
+     "min": 249,
+     "times": [
+      249,
+      252,
+      249,
+      251,
+      254,
+      251,
+      286,
+      257,
+      284
+     ]
+    }
+   },
+   "src/journal/store.ts": {
+    "before": {
+     "median": 1507,
+     "min": 1254,
+     "times": [
+      1507,
+      1537,
+      2907,
+      1254,
+      3141,
+      1274,
+      3894,
+      1465,
+      1459
+     ]
+    },
+    "after": {
+     "median": 1386,
+     "min": 1297,
+     "times": [
+      1297,
+      1421,
+      1302,
+      1365,
+      1305,
+      1413,
+      3234,
+      1891,
+      1386
+     ]
+    }
+   },
+   "src/lifecycle/telemetry.ts": {
+    "before": {
+     "median": 1501,
+     "min": 1229,
+     "times": [
+      1501,
+      1274,
+      3547,
+      1229,
+      3792,
+      1276,
+      1972,
+      1982,
+      1394
+     ]
+    },
+    "after": {
+     "median": 1532,
+     "min": 1459,
+     "times": [
+      1532,
+      1505,
+      1489,
+      1459,
+      1577,
+      1512,
+      4038,
+      3482,
+      1578
+     ]
+    }
+   },
+   "src/lifecycle/hook.ts": {
+    "before": {
+     "median": 3178,
+     "min": 2726,
+     "times": [
+      5434,
+      2809,
+      5254,
+      2736,
+      2726,
+      3059,
+      3178,
+      6516,
+      5486
+     ]
+    },
+    "after": {
+     "median": 4036,
+     "min": 3019,
+     "times": [
+      5267,
+      5621,
+      3691,
+      3019,
+      3650,
+      3052,
+      4036,
+      5271,
+      4040
+     ]
+    }
+   },
+   "src/journal/workVerbs.ts": {
+    "before": {
+     "median": 1516,
+     "min": 1389,
+     "times": [
+      1752,
+      1389,
+      1443,
+      1406,
+      1516,
+      1562,
+      1569,
+      1462,
+      3671
+     ]
+    },
+    "after": {
+     "median": 2156,
+     "min": 1457,
+     "times": [
+      4751,
+      1457,
+      3251,
+      2113,
+      3315,
+      2156,
+      1632,
+      1564,
+      3371
+     ]
+    }
+   },
+   "src/journal/feed.ts": {
+    "before": {
+     "median": 1357,
+     "min": 1260,
+     "times": [
+      1280,
+      1331,
+      1267,
+      1675,
+      1260,
+      1662,
+      1637,
+      1357,
+      1455
+     ]
+    },
+    "after": {
+     "median": 3051,
+     "min": 1553,
+     "times": [
+      1627,
+      1553,
+      3661,
+      3159,
+      3454,
+      3051,
+      1657,
+      1635,
+      4211
+     ]
+    }
+   },
+   "src/lifecycle/version.ts": {
+    "before": {
+     "median": 1499,
+     "min": 1236,
+     "times": [
+      1236,
+      1499,
+      1263,
+      3109,
+      1253,
+      3380,
+      1675,
+      1323,
+      1500
+     ]
+    },
+    "after": {
+     "median": 1384,
+     "min": 1325,
+     "times": [
+      1325,
+      1376,
+      1329,
+      3549,
+      1969,
+      3600,
+      1451,
+      1378,
+      1384
+     ]
+    }
+   }
+  }
+ },
+ "with queuePath": {
+  "rounds": 7,
+  "chokepoints added": 7,
+  "files": {
+   "src/lifecycle/well-known.ts": {
+    "before": {
+     "median": 263,
+     "min": 257,
+     "times": [
+      265,
+      448,
+      271,
+      263,
+      257,
+      258,
+      261
+     ]
+    },
+    "after": {
+     "median": 267,
+     "min": 260,
+     "times": [
+      277,
+      887,
+      265,
+      260,
+      267,
+      268,
+      260
+     ]
+    }
+   },
+   "src/journal/store.ts": {
+    "before": {
+     "median": 1342,
+     "min": 1320,
+     "times": [
+      4290,
+      3901,
+      3458,
+      1340,
+      1328,
+      1342,
+      1320
+     ]
+    },
+    "after": {
+     "median": 1372,
+     "min": 1324,
+     "times": [
+      4637,
+      4657,
+      2070,
+      1324,
+      1354,
+      1372,
+      1334
+     ]
+    }
+   },
+   "src/lifecycle/telemetry.ts": {
+    "before": {
+     "median": 1308,
+     "min": 1242,
+     "times": [
+      1308,
+      2156,
+      3784,
+      1403,
+      1296,
+      1275,
+      1242
+     ]
+    },
+    "after": {
+     "median": 2355,
+     "min": 1884,
+     "times": [
+      2166,
+      5320,
+      4668,
+      2736,
+      2355,
+      2008,
+      1884
+     ]
+    }
+   },
+   "src/lifecycle/hook.ts": {
+    "before": {
+     "median": 3091,
+     "min": 2792,
+     "times": [
+      2952,
+      3091,
+      3018,
+      5768,
+      3289,
+      4960,
+      2792
+     ]
+    },
+    "after": {
+     "median": 6427,
+     "min": 3030,
+     "times": [
+      3371,
+      8887,
+      5749,
+      6515,
+      6887,
+      6427,
+      3030
+     ]
+    }
+   },
+   "src/journal/workVerbs.ts": {
+    "before": {
+     "median": 1658,
+     "min": 1475,
+     "times": [
+      1651,
+      1658,
+      1531,
+      3787,
+      1475,
+      3698,
+      1783
+     ]
+    },
+    "after": {
+     "median": 1624,
+     "min": 1553,
+     "times": [
+      1785,
+      6941,
+      1624,
+      1555,
+      1583,
+      1719,
+      1553
+     ]
+    }
+   },
+   "src/journal/feed.ts": {
+    "before": {
+     "median": 1540,
+     "min": 1329,
+     "times": [
+      3128,
+      1540,
+      1478,
+      1329,
+      1329,
+      4020,
+      2981
+     ]
+    },
+    "after": {
+     "median": 1537,
+     "min": 1424,
+     "times": [
+      1690,
+      7149,
+      1537,
+      1430,
+      1524,
+      1424,
+      2158
+     ]
+    }
+   },
+   "src/lifecycle/version.ts": {
+    "before": {
+     "median": 1375,
+     "min": 1250,
+     "times": [
+      6223,
+      1991,
+      1375,
+      1272,
+      1250,
+      1254,
+      3404
+     ]
+    },
+    "after": {
+     "median": 1934,
+     "min": 1801,
+     "times": [
+      3736,
+      4431,
+      1801,
+      1858,
+      1934,
+      1829,
+      3935
+     ]
+    }
+   }
+  }
+ },
+ "without queuePath": {
+  "rounds": 9,
+  "chokepoints added": 6,
+  "files": {
+   "src/lifecycle/telemetry.ts": {
+    "before": {
+     "median": 1445,
+     "min": 1263,
+     "times": [
+      3583,
+      3429,
+      1263,
+      1323,
+      1340,
+      1639,
+      1445,
+      1338,
+      3349
+     ]
+    },
+    "after": {
+     "median": 1641,
+     "min": 1547,
+     "times": [
+      1613,
+      1547,
+      1589,
+      3747,
+      1560,
+      2038,
+      2952,
+      1641,
+      1746
+     ]
+    }
+   },
+   "src/lifecycle/hook.ts": {
+    "before": {
+     "median": 3033,
+     "min": 2730,
+     "times": [
+      6336,
+      5135,
+      2752,
+      2754,
+      2730,
+      2824,
+      3033,
+      4003,
+      5890
+     ]
+    },
+    "after": {
+     "median": 4778,
+     "min": 3050,
+     "times": [
+      3232,
+      4778,
+      4875,
+      4861,
+      3050,
+      7188,
+      6814,
+      3183,
+      3454
+     ]
+    }
+   }
+  }
+ },
+ "grading in run (ms, reference-choked, refutation included)": {
+  "appendWork": 558,
+  "refreshLatest": 340,
+  "writeCursor": 312,
+  "HOOK_VOICE_DIR": 232,
+  "FETCH_SENDER": 281,
+  "queuePath": 743,
+  "flushQueue": 132
+ },
+ "grading in run (ms, visibility-choked)": {
+  "HOOK_VOICE_DIR": 1532,
+  "FETCH_SENDER": 621
+ }
+}

@@ -64,6 +64,10 @@
  * with what fires it; PreToolUse delivers a practice whole when the tool use
  * about to run fires it, before the act rather than after; regulate names one
  * that fired and has no enactment since, advisory, never refused.
+ * Declared mirrors ride with PostToolUse (mirrors.ts): an edit to a file a
+ * mirror watches reads the list and what it mirrors again and names a
+ * disagreement as advice, never a block; a session's start and stop keep the
+ * index of watched files from the spec model they already read.
  */
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -74,7 +78,8 @@ import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
-import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
+import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -91,31 +96,19 @@ import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import { mirrorBlock, refreshMirrorsInBackground } from "../readings/mirrors/recorded.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
-import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
-import { earlierSearchLines, OWN_CLI, versionBlock } from "./version.ts";
+import { namesWrittenFiles, writtenNames } from "./host-tools.ts";
+import { keepMirrorIndex, mirrorAlarm } from "./mirrors.ts";
+import { earlierHookLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
-export const HOOK_EVENTS = [
-  "SessionStart",
-  "SubagentStart",
-  "UserPromptSubmit",
-  "PreToolUse",
-  "PostToolUse",
-  "Stop",
-  "SubagentStop",
-] as const;
-
-export type HookEvent = (typeof HOOK_EVENTS)[number];
-
-export function isHookEvent(name: string): name is HookEvent {
-  return (HOOK_EVENTS as readonly string[]).includes(name);
-}
+export { HOOK_EVENTS, isHookEvent, type HookEvent };
 
 /** The exit code both hosts read as a refusal with the reason on stderr. */
 export const REFUSE_EXIT = 2;
@@ -566,9 +559,6 @@ export function lexiconStopText(report: CheckReport | undefined, walls: readonly
   return { text: out.join("\n") + "\n", owed };
 }
 
-/** Tools that read a file and name it the same way a writing tool does. */
-const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "read_file", "list_files", "search"]);
-
 /**
  * The project-relative paths a tool event wrote under the root; none when it
  * wrote no file there. `host` is the folder the host runs in, which a tool's
@@ -585,29 +575,17 @@ export function writtenFiles(root: string, input: HookInput, host: string = root
 }
 
 /**
- * Every path a tool event writes, absolute: an edit tool's file and a patch's
- * files, a relative one resolved against `host`, the folder the host runs in;
- * and what a shell command writes, against the folder it runs in (the event's
- * cwd, else `host`). A reading tool writes nothing. Words only: nothing is
- * read or stat'd.
+ * Every path a tool event writes, absolute: a writing tool's named files and
+ * a patch's, a relative one resolved against `host`, the folder the host
+ * runs in; and what a shell command writes, against the folder it runs in
+ * (the event's cwd, else `host`). Which tools write, and how each names its
+ * files, is host-tools.ts's: a tool it does not declare writes nothing but
+ * what a command in its input writes. Words only: nothing is read or stat'd.
  */
 export function writtenPaths(input: HookInput, host: string): string[] {
-  if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
-  const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
-  const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
-  const isPatch = typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch";
-  if(isPatch) {
-    const patch=typeof input.tool_input === "string" ? input.tool_input : [record["patch"],record["input"],record["command"]].find((v):v is string=>typeof v === "string");
-    if(patch?.trimStart().startsWith("*** Begin Patch") && patch.trimEnd().endsWith("*** End Patch")) {
-      for(const match of patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)) paths.push(match[1]!.trim());
-    }
-  }
-  // A shell command writes files too (a heredoc, sed -i, tee, a redirect, cp): read them from its words, against the folder it runs in.
-  const shellPaths: string[] = [];
-  const command = isPatch ? undefined : shellCommandOf(record);
-  if(command !== undefined) shellPaths.push(...shellWrittenPaths(command));
+  const { named, shell } = writtenNames(input);
   const ran = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : host;
-  return [...new Set([...paths.map((path) => resolve(host, path)), ...shellPaths.map((path) => resolve(ran, path))])];
+  return [...new Set([...named.map((path) => resolve(host, path)), ...shell.map((path) => resolve(ran, path))])];
 }
 
 /** The written files that are the project's own: a nested checkout's or an ignored file is not this session's patch. */
@@ -676,10 +654,16 @@ async function checkAtEdit(root: string, input: HookInput, options: HookOptions,
   const agent = agentOf(input);
   // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
+  if (outcome.instrumentReason !== undefined) options.onEditCheck?.({ checked: 0, failed: [], unchecked: touched.length, reason: outcome.instrumentReason });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.
   const unchecked = outcome.details.filter((d) => d.entry.verdict === "not run" && !/\bis prose\b/.test(d.entry.reason));
+  options.onEditCheck?.({
+    checked: outcome.details.filter((d) => d.entry.verdict === "pass" || d.entry.verdict === "fail").length,
+    failed: failed.map((d) => ({ invariant: `${d.entry.component}/${d.entry.name}`, ...(d.entry.bypasses[0] === undefined ? {} : { bypass: `${d.entry.bypasses[0].file}:${d.entry.bypasses[0].line} in ${d.entry.bypasses[0].symbol}` }) })),
+    unchecked: unchecked.length,
+  });
   const uncheckedText = unchecked.length === 0 ? "" : `Coherence could not check ${unchecked.length} chokepoint invariant${unchecked.length === 1 ? "" : "s"} at this edit:\n${unchecked.map((d) => `  ○ ${d.entry.component}/${d.entry.name}: ${d.entry.reason}`).join("\n")}\n`;
   if (failed.length === 0) return uncheckedText;
   const cli = await cliName(root);
@@ -790,16 +774,17 @@ export async function startContext(root: string, input: HookInput = {}, report?:
  */
 export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
   const settings = installedRoot(root, env) ?? root;
-  const earlier = earlierSearchLines(settings);
+  const earlier = earlierHookLines(settings);
   return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
 }
 
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
-  const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
+  // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
@@ -920,6 +905,27 @@ export interface HookOptions {
    * startUpdateCheck, which asks at most once a day; absent (a test), nothing is started.
    */
   updateCheck?: ((root: string, event: string) => void) | undefined;
+  /**
+   * Start the detached mirror reading at a session start and a stop, once the
+   * answer is made, never waited on: the hook never takes one. The command
+   * line passes MIRROR_REFRESH; absent (a test), nothing is started.
+   */
+  mirrors?: ((root: string) => void) | undefined;
+  /**
+   * Told the verdict of an edit's chokepoint check as data, besides the text
+   * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
+   * that marks the tool call's row for the user. Absent (the command line), nothing is told.
+   */
+  onEditCheck?: ((verdict: EditVerdict) => void) | undefined;
+}
+
+/** An edit's chokepoint check as data: how many invariants it checked, which failed (with their first bypass), and how many it could not check. */
+export interface EditVerdict {
+  checked: number;
+  failed: { invariant: string; bypass?: string }[];
+  unchecked: number;
+  /** Why the instrument could not check at all, when it could not. */
+  reason?: string;
 }
 
 /**
@@ -992,6 +998,11 @@ export const WARM_UP = (root: string): void => {
 /** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
   refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
+export const MIRROR_REFRESH = (root: string): void => {
+  refreshMirrorsInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "query", "mirrors", "--refresh"]);
 };
 
 /** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
@@ -1118,8 +1129,6 @@ function markOriented(root: string, session: string): void {
   }
 }
 
-/** The tools whose event names the files it writes, so the files, not the cwd, say which project it is about. */
-const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 /**
  * The project an event belongs to, for a hook installed at `base`: a tool
@@ -1127,10 +1136,23 @@ const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "
  * event, a shell command among them, where its cwd is (hookProject).
  */
 function eventProject(event: HookEvent, input: HookInput, base: string, cwd: string): HookProject {
-  const tool = typeof input.tool_name === "string" ? input.tool_name : "";
-  const fileTool = FILE_TOOLS.has(tool) || tool.split(".").at(-1) === "apply_patch";
-  const subjects = (event === "PreToolUse" || event === "PostToolUse") && fileTool ? writtenPaths(input, base) : [];
+  const subjects = (event === "PreToolUse" || event === "PostToolUse") && namesWrittenFiles(input.tool_name) ? writtenPaths(input, base) : [];
   return hookProject(base, subjects, cwd);
+}
+
+/**
+ * Keep the index of watched files for the declared mirrors, from the spec
+ * model this event already read: a start and a stop, so a mirror declared or
+ * a closure grown by a change no hook saw is watched from then on.
+ */
+function keepMirrorsFromModel(root: string): void {
+  const model = specModelOrNull(root);
+  if ("error" in model) return;
+  try {
+    keepMirrorIndex(root, model.components.flatMap((c) => c.mirrors ?? []));
+  } catch {
+    // An index that cannot be built is built again at the next edit that needs one, which says so if it cannot.
+  }
 }
 
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
@@ -1186,6 +1208,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (event === "SessionStart") options.updateCheck?.(root, event);
+    if (event === "SessionStart" || event === "Stop") options.mirrors?.(root);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;
@@ -1255,6 +1278,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
         }
         const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
+        keepMirrorsFromModel(root);
         const session = sessionOf(input);
         if (session !== undefined) openFeed(root, session);
         // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
@@ -1294,6 +1318,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
+        // A hand list declared as a mirror, read again only when this edit wrote a file it watches: one lookup otherwise.
+        const mirror = event === "PostToolUse" ? mirrorAlarm(root, written, session) : { text: "", commit: () => {} };
         // The full reading walks the whole corpus (seconds on a real project), so it runs only at a prompt when the tree moved since this
         // session's last reading, and it keeps the vocabulary state an edit reads (vocabulary-state.ts). An edit reads the files it wrote
         // against that state, never the corpus; with no state valid for this code and lexicon, it takes the full reading once, which keeps one.
@@ -1351,12 +1377,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
-        const context = await voiced(root, input, [lastStop,feed.text,edit,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
+        const context = await voiced(root, input, [lastStop,feed.text,edit,mirror.text,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
+        // A mirror that agrees again is forgotten at once: nothing was said that must first reach the host.
+        if (mirror.text === "") mirror.commit();
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
+        const delivered = voice.override === undefined && (feed.text !== "" || mirror.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
+        const commit=()=> { if(feed.text) feed.commit(); if(mirror.text) mirror.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1381,6 +1409,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const gapText = await gapStopText(root, input, changed.files);
         const undeclaredText = await undeclaredStopText(root, changed.files);
         const heldModel = specModelOrNull(root);
+        keepMirrorsFromModel(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
         const economyText = economyStopText(snapshot);
         const latencyText = hookLatencyStopText(root, session);

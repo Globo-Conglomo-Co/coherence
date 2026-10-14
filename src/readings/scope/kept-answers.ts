@@ -39,13 +39,14 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
-import { resolveDotted } from "../../adapters/python.ts";
-import { specifierCandidates } from "../../adapters/typescript.ts";
+import { closureOf } from "../../enforcement/code-fingerprint.ts";
 import type { KeptReport } from "./model.ts";
+import { pythonKeptModules } from "./python-scope.ts";
+import { typescriptKeptModules } from "./typescript-scope.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
@@ -61,15 +62,28 @@ const KEPT_EXTENSIONS: Record<Language, readonly string[]> = {
 /** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
 const BASIS_FILE = /^(?:tsconfig(?:\.[\w-]+)*\.json|jsconfig\.json|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|pyproject\.toml|pyrightconfig\.json|setup\.cfg|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|coherence\.config\.json)$/;
 
-/** The adapter code an answer comes from: a change to it may change any answer. */
-const ADAPTER_SOURCES = ["adapter.ts", "index.ts", "jsonrpc.ts", "project-files.ts", "python.ts", "typescript.ts"];
+/** Where the language adapters are entered: every module it reaches is code an answer comes from. */
+const ADAPTER_ENTRY = "adapters/index.ts";
+
+/**
+ * The adapter code an answer comes from, a change to any of which may change
+ * any answer: every module the adapters' entry imports, followed to the end,
+ * as this installation holds them (the sources in a checkout, the compiled
+ * modules in the published package, which ships no sources).
+ */
+export function adapterCode(): string[] {
+  return closureOf([ADAPTER_ENTRY]);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-const TS_WILDCARD = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/gm;
-const PY_STAR = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/gm;
+/** The module files a changed file star-imports or wildcard re-exports, per language, each language's in its own module: a language with none fails to compile. */
+const KEPT_MODULES: Record<Language, (file: string, text: string) => string[]> = {
+  typescript: typescriptKeptModules,
+  python: pythonKeptModules,
+};
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
@@ -113,15 +127,23 @@ function basisOf(root: string, language: Language, files: readonly string[], ign
     // An unreadable package.json is one more basis value, never a reason to reuse answers it might have changed.
   }
   basis["Coherence's version"] = version;
-  basis["the language adapter's code"] = digest(
-    ADAPTER_SOURCES.map((file) => {
-      try {
-        return readFileSync(join(COHERENCE_ROOT, "src", "adapters", file), "utf8");
-      } catch {
-        return `${file}: unreadable`;
-      }
-    }).join("\u0000"),
-  );
+  const code = adapterCode();
+  // No module found is never an empty basis that holds: the key says so, and differs from any reading that found its code.
+  basis["the language adapter's code"] =
+    code.length === 0
+      ? `unread: no module found from ${ADAPTER_ENTRY}`
+      : digest(
+          code
+            .map((file) => {
+              const name = relative(COHERENCE_ROOT, file);
+              try {
+                return `${name}\u0000${readFileSync(file, "utf8")}`;
+              } catch {
+                return `${name}: unreadable`;
+              }
+            })
+            .join("\u0000"),
+        );
   for (const file of files) {
     if (!BASIS_FILE.test(basename(file))) continue;
     try {
@@ -178,18 +200,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
       continue;
     }
     for (const token of text.match(TOKEN) ?? []) tokens.add(token);
-    if (language === "typescript") {
-      for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        for (const candidate of specifierCandidates(file, specifier!)) modules.add(candidate);
-      }
-    } else {
-      for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
-        const target = resolveDotted(file, dots!, dotted!);
-        if (target === undefined) continue;
-        modules.add(`${target}.py`);
-        modules.add(`${target}/__init__.py`);
-      }
-    }
+    for (const module of KEPT_MODULES[language](file, text)) modules.add(module);
   }
   return { files, tokens, modules };
 }

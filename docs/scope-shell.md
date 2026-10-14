@@ -29,7 +29,14 @@ the latest run records plus every run holding some enforcement's latest
 entry, and the latest journal records plus every open escalation and what
 those records point at. Every verdict derived from the window equals the one
 derived from every record, and the count left out is shown; the whole journal
-is one `journal` command away. The agent query builds without the window.
+is one `journal` command away. The reference sites the latest chokepoint
+entries carry share one window of 500 (`SITE_WINDOW`), bypass sites always
+listed; each entry counts the rest by component, endpoint, class and test
+mark, so every count the map and the views derive from sites is exact, and
+the reliance listing says how many it lists. The live page loads the rest
+from `/api/sites`; a snapshot names `query relies-on`. So neither the code
+nor the number of chokepoints grows the page. The agent query builds without
+the window.
 
 In the browser, `page.ts` renders the embedded state with `renderShell`, a
 pure function from state to markup. Every reader change is a state change
@@ -227,9 +234,12 @@ twelve enactments (evidenced, done, claimed, deviated, skipped, or absent
 when the version enacted lacked the step), the reasons sessions gave for
 deviating, its pitfalls linked to the records that witnessed them, what it
 was learned from, its versions and amendments, and its enactments. The
-derivations are `practices.ts`; the journal window keeps every enactment,
-every decision citing one, and every record a practice cites, so none of it
-depends on the record's age. `query practice` prints the same story.
+derivations are `practices.ts`; the journal window keeps each practice's
+latest twelve enactments (what the strips read), every decision citing an
+enactment and what it cites, and every record a practice cites, so none of
+it depends on the record's age; the enactment list says how many of a
+practice's enactments the page holds, and the live page loads the rest with
+earlier journal records. `query practice` prints the same story.
 
 **Runs** lists the records latest first with session, agent, commit, dirty
 flag, and counts; the verdicts one click away; on the latest, what the status
@@ -293,7 +303,12 @@ evidence.
 3. Write a pure render pair (tools and results) beside `lexicon-view.ts`,
    with card ids under a new prefix registered in `resolveHash`.
 4. List it in `VIEWS` in `shell.ts` and add its cases to `renderViewTools`
-   and `renderViewResults`; add the file to `BROWSER_SOURCES` in order.
+   and `renderViewResults`. There is no list of browser sources to add it
+   to: the bundle is every module `page.ts` imports at run time, followed to
+   the end, so importing the new view where it is used is what puts it in.
 5. Top-level names are one name space across the browser sources; the
-   builder refuses a duplicate by name.
+   builder refuses a duplicate by name. A browser source imports names in
+   braces under their exported names, by relative path; a renamed,
+   namespace or default import, or one of a package or a `node:` module,
+   fails the build, since the page could not resolve it.
 6. Add what it must show to `check.test.ts`.

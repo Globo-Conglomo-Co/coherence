@@ -17,6 +17,7 @@ import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
+import { writersUnmatched } from "../lifecycle/host-tools.ts";
 import { practiceAnswer, practiceOrientText, toolUseOf } from "../lifecycle/practice-delivery.ts";
 import { scaffoldCommand } from "../scaffold/cli.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
@@ -293,7 +294,7 @@ test("PreToolUse delivers a fired practice whole once per version per session, t
   const quiet = await fire("s2", "ls -la");
   assert.equal(quiet.stdout, "");
   assert.equal(quiet.exit, 0);
-  assert.deepEqual(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher, "Bash|Edit|Write|MultiEdit|NotebookEdit");
+  assert.deepEqual(writersUnmatched(installedEntry({ command: "coherence", host: "claude" }, "PreToolUse").matcher), [], "Claude Code runs the hook for every tool that writes");
 });
 
 test("regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it", async () => {

@@ -13,10 +13,12 @@ import type {
   JournalKind,
   JournalRecord,
   LatestEntry,
+  PageEntry,
   RunEntry,
   RunRecord,
   ShellState,
   RecordedSite,
+  SiteTally,
   SpecComponent,
   SpecInvariant,
   StructurePreview,
@@ -288,9 +290,9 @@ export interface RelianceSite {
   test: boolean;
 }
 
-/** Complete means both endpoint queries completed; unknown never means empty. */
+/** Complete means both endpoint queries completed; unknown never means empty. `left` counts the sites the page's window does not carry (0 when it carries them all). */
 export type RelianceEvidence =
-  | { status: "complete"; sites: RelianceSite[] }
+  | { status: "complete"; sites: RelianceSite[]; left: number }
   | { status: "unknown"; reason: string };
 
 /** The component whose folder is the longest prefix of the file, or undefined when no component holds it. */
@@ -350,7 +352,7 @@ function relianceEvidenceOf(
         a.siteClass.localeCompare(b.siteClass) ||
         a.symbol.localeCompare(b.symbol),
     );
-  return { status: "complete", sites };
+  return { status: "complete", sites, left: sitesLeftCount(entry) };
 }
 
 export interface RelianceEntry {
@@ -510,6 +512,70 @@ export const JOURNAL_WINDOW = 150;
  * command that shows it.
  */
 export const CITED_WINDOW = 60;
+/**
+ * How many of each practice's latest enactments a page embeds beyond the
+ * latest records: what the Practices view's strips read (STRIP_WINDOW). An
+ * enactment past it is counted with the journal's other omitted records,
+ * and the view says how many of a practice's enactments it holds.
+ */
+export const ENACTMENT_WINDOW = 12;
+
+/**
+ * How many reference sites a page carries across every latest chokepoint
+ * entry. Bypass sites are always carried and count against it; the rest is
+ * shared evenly (an entry that needs less gives the rest back), so neither a
+ * growing codebase nor another chokepoint grows the page; every site left
+ * out is counted on its entry (`sitesLeft`).
+ */
+export const SITE_WINDOW = 500;
+
+/** How many of an entry's sites the page counts and does not carry: the sum of its tally. */
+export function sitesLeftCount(entry: PageEntry | LatestEntry): number {
+  return (entry.sitesLeft ?? []).reduce((sum, tally) => sum + tally.count, 0);
+}
+
+/** Even shares of `budget` over `needs`, the smallest needs served first, so no share is larger than its need and none is left unused while a need is unmet. */
+function evenShares(needs: readonly number[], budget: number): number[] {
+  const order = needs.map((_, i) => i).sort((a, b) => needs[a]! - needs[b]! || a - b);
+  const shares = needs.map(() => 0);
+  let left = budget;
+  order.forEach((i, k) => {
+    shares[i] = Math.min(needs[i]!, Math.floor(left / (order.length - k)));
+    left -= shares[i]!;
+  });
+  return shares;
+}
+
+/**
+ * One latest chokepoint entry's sites within its share: every bypass site,
+ * then sites from outside the owner component, then the owner's, tests
+ * last, each by file and line; the carried ones keep the run's order, and
+ * the rest are counted by component, endpoint, class and test mark.
+ */
+function shareSites(entry: RunEntry, share: number, components: readonly SpecComponent[]): PageEntry {
+  const sites = entry.sites!;
+  const folder = (site: RecordedSite): string | null => componentOfFile(site.file, components)?.folder ?? null;
+  const rank = (site: RecordedSite): number => (site.class === "bypass" ? 0 : site.test ? 3 : folder(site) === entry.component ? 2 : 1);
+  const order = sites
+    .map((site, index) => ({ site, index }))
+    .filter(({ site }) => site.class !== "bypass")
+    .sort((a, b) => rank(a.site) - rank(b.site) || a.site.file.localeCompare(b.site.file) || a.site.line - b.site.line || a.index - b.index);
+  if (order.length <= share) return entry;
+  const left = new Set(order.slice(share).map(({ index }) => index));
+  const tally = new Map<string, SiteTally>();
+  sites.forEach((site, index) => {
+    if (!left.has(index)) return;
+    const component = folder(site);
+    const key = `${component ?? ""}\u0000${site.of}\u0000${site.class}\u0000${site.test}`;
+    const known = tally.get(key);
+    if (known === undefined) tally.set(key, { component, of: site.of, class: site.class, test: site.test, count: 1 });
+    else known.count += 1;
+  });
+  const sitesLeft = [...tally.values()].sort(
+    (a, b) => (a.component ?? "~").localeCompare(b.component ?? "~") || a.of.localeCompare(b.of) || a.class.localeCompare(b.class) || Number(a.test) - Number(b.test),
+  );
+  return { ...entry, sites: sites.filter((_, index) => !left.has(index)), sitesLeft };
+}
 
 /**
  * The run records a page embeds: the latest `keep` whole, and every older run
@@ -521,9 +587,16 @@ export const CITED_WINDOW = 60;
  * entries, and the verdicts of the rest as counts (`superseded`, by run id),
  * so a full run of hundreds of entries that still holds two latest verdicts
  * costs the page two entries, not hundreds. Superseded entries in the latest
- * `keep` carry no sites: a full run's sites are most of its bytes.
+ * `keep` carry no sites: a full run's sites are most of its bytes. The
+ * latest entries share `sites` reference sites between them (SITE_WINDOW),
+ * each counting what it leaves out by the components it reads them against.
  */
-export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WINDOW): { records: RunRecord[]; omitted: number; superseded: Record<string, VerdictCounts> } {
+export function windowRuns(
+  records: readonly RunRecord[],
+  keep: number = RUN_WINDOW,
+  components: readonly SpecComponent[] = [],
+  sites: number = SITE_WINDOW,
+): { records: RunRecord[]; omitted: number; superseded: Record<string, VerdictCounts> } {
   const holders = new Map<string, number>();
   records.forEach((record, index) => {
     for (const entry of record.invariants) holders.set(entryKey(entry.component, entry.name, entry.form), index);
@@ -531,16 +604,23 @@ export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WIN
   const kept = new Set(holders.values());
   const recent = Math.max(0, records.length - keep);
   for (let index = recent; index < records.length; index++) kept.add(index);
+  const holds = (entry: RunEntry, index: number): boolean => holders.get(entryKey(entry.component, entry.name, entry.form)) === index;
+  // The latest entries with sites, and the share of the site window each carries: bypass sites first, never cut.
+  const latest = records.flatMap((record, index) => (kept.has(index) ? record.invariants.filter((entry) => entry.sites !== undefined && holds(entry, index)) : []));
+  const bypassSites = latest.reduce((sum, entry) => sum + entry.sites!.filter((site) => site.class === "bypass").length, 0);
+  const share = evenShares(latest.map((entry) => entry.sites!.length - entry.sites!.filter((site) => site.class === "bypass").length), Math.max(0, sites - bypassSites));
+  const shares = new Map(latest.map((entry, i) => [entry, share[i]!]));
+  const carry = (entry: RunEntry): RunEntry => (shares.has(entry) ? shareSites(entry, shares.get(entry)!, components) : entry);
   const superseded: Record<string, VerdictCounts> = {};
   const window = records.flatMap((record, index) => {
     if (!kept.has(index)) return [];
-    const holds = (entry: RunEntry): boolean => holders.get(entryKey(entry.component, entry.name, entry.form)) === index;
     if (index < recent) {
-      const held = record.invariants.filter(holds);
-      if (held.length < record.invariants.length) superseded[runId(record)] = verdictCounts({ ...record, invariants: record.invariants.filter((entry) => !holds(entry)) });
-      return [held.length === record.invariants.length ? record : { ...record, invariants: held }];
+      const held = record.invariants.filter((entry) => holds(entry, index));
+      if (held.length < record.invariants.length) superseded[runId(record)] = verdictCounts({ ...record, invariants: record.invariants.filter((entry) => !holds(entry, index)) });
+      const invariants = held.map(carry);
+      return [held.length === record.invariants.length && invariants.every((entry, i) => entry === held[i]) ? record : { ...record, invariants }];
     }
-    const invariants = record.invariants.map((entry) => (entry.sites === undefined || holds(entry) ? entry : (({ sites: _sites, ...rest }) => rest)(entry)));
+    const invariants = record.invariants.map((entry) => (entry.sites === undefined ? entry : holds(entry, index) ? carry(entry) : (({ sites: _sites, ...rest }) => rest)(entry)));
     return [invariants.every((entry, i) => entry === record.invariants[i]) ? record : { ...record, invariants }];
   });
   return { records: window, omitted: records.length - window.length, superseded };
@@ -552,7 +632,8 @@ export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WIN
  * cites (so a citation lands on a card; the latest citers are served first),
  * and every record one of those points at (so a retraction or a close can
  * name what it answers), in their original order. `orders` supplies the
- * work orders' own citations.
+ * work orders' own citations. Of the enactments it keeps each practice's
+ * latest `enactmentWindow`, every amendment and what an amendment cites.
  */
 export function windowJournal(
   records: readonly JournalRecord[],
@@ -560,15 +641,24 @@ export function windowJournal(
   orders: readonly WorkOrder[] = [],
   cap: number = CITED_WINDOW,
   pinned: ReadonlySet<string> = new Set(),
+  enactmentWindow: number = ENACTMENT_WINDOW,
 ): { records: JournalRecord[]; omitted: number } {
   const kept = new Set<string>(records.slice(Math.max(0, records.length - keep)).map((record) => record.id));
   // Records a reading must be able to land on whatever their age: what the practices cite (their pitfalls and what they were learned from).
   for (const record of records) if (pinned.has(record.id)) kept.add(record.id);
   for (const escalation of openEscalations(records)) kept.add(escalation.id);
-  // The Practices view reads every enactment and every decision that cites one (an amendment), so the window keeps them all: they are few.
-  const enactments = new Set(records.filter((record) => record.kind === "enactment").map((record) => record.id));
+  // The Practices view's strips read each practice's latest ENACTMENT_WINDOW enactments, so the window keeps those; every decision
+  // that cites an enactment (an amendment), and the enactments it cites, are kept whatever their age: they are few.
+  const enactments = records.filter((record): record is Extract<JournalRecord, { kind: "enactment" }> => record.kind === "enactment");
+  const byPractice = new Map<string, JournalRecord[]>();
+  for (const enactment of [...enactments].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))) byPractice.set(enactment.practice, [...(byPractice.get(enactment.practice) ?? []), enactment]);
+  for (const mine of byPractice.values()) for (const enactment of mine.slice(-enactmentWindow)) kept.add(enactment.id);
+  const enacted = new Set(enactments.map((record) => record.id));
   for (const record of records) {
-    if (enactments.has(record.id) || (record.kind === "decision" && citesOf(record).some((id) => enactments.has(id)))) kept.add(record.id);
+    const amends = record.kind === "decision" ? citesOf(record).filter((id) => enacted.has(id)) : [];
+    if (amends.length === 0) continue;
+    kept.add(record.id);
+    for (const id of amends) kept.add(id);
   }
   const present = new Set(records.map((record) => record.id));
   const citing = [...records.filter((record) => kept.has(record.id)).reverse().map(citesOf), ...[...orders].reverse().map(workCites)];

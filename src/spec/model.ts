@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
+import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Mirror, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
@@ -32,6 +32,26 @@ import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPr
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
+
+/**
+ * The project files the spec model finds by their names, each kind by the
+ * suffix that marks it. The model's walk selects its specs and practice files
+ * through modelFileKind, and so does every watcher that refreshes what the
+ * model drew, so a kind of file the model begins to read is watched with it.
+ */
+export const MODEL_FILES = { spec: SPEC_SUFFIX, practice: PRACTICE_SUFFIX } as const;
+
+export type ModelFileKind = keyof typeof MODEL_FILES;
+
+/** Which of the model's files a path is, by its name, or undefined when the model's walk never reads it. */
+export function modelFileKind(rel: string): ModelFileKind | undefined {
+  return (Object.keys(MODEL_FILES) as ModelFileKind[]).find((kind) => rel.endsWith(MODEL_FILES[kind]));
+}
+
+/** Whether the spec model reads this project path: one of its files by name, or the config. */
+export function readByModel(rel: string): boolean {
+  return modelFileKind(rel) !== undefined || rel === CONFIG_FILE;
+}
 
 export interface ModelInvariant extends Invariant {
   /** The folder of the component the bullet lives in. */
@@ -61,6 +81,8 @@ export interface Component {
   trustLevels: TrustLevel[] | undefined;
   /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
   entrances: ModelEntrance[];
+  /** The hand lists this component declares as mirrors, each with the files it was found in. */
+  mirrors: ModelMirror[];
   invariants: ModelInvariant[];
   /** The practice file paired with the spec, when there is one. */
   practicePath: string | undefined;
@@ -75,6 +97,17 @@ export interface ModelEntrance extends Entrance {
   component: string;
   /** The project-relative file whose top level declares the handler, when one was found. */
   file: string | undefined;
+}
+
+export interface ModelMirror extends Mirror {
+  /** The folder of the component whose spec declares it. */
+  component: string;
+  /** The project-relative spec that declares it. */
+  spec: string;
+  /** The project-relative file whose top level declares the list, when it was found. */
+  listFile: string | undefined;
+  /** The project-relative files the recipe names (the closure's starting files, or the partner literal's file), those found. */
+  sources: string[];
 }
 
 export interface Counts {
@@ -289,6 +322,32 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
   return entries;
 }
 
+/**
+ * Every mirror the specs declare, read the light way chokepointIndex reads
+ * them: a listing of the specs and a parse of each, never the whole model.
+ * A name or file that is gone leaves listFile or a source unfound; the model's
+ * problems say so, and the alarm says so at the edit.
+ */
+export function declaredMirrors(rootGiven: string): ModelMirror[] {
+  const root = resolve(rootGiven);
+  const config = readConfig(root);
+  const bounds = walkBounds(root, config.ignore);
+  const seen = new Set<string>();
+  const mirrors: ModelMirror[] = [];
+  for (const rel of projectFilesEnding(root, SPEC_SUFFIX).filter((file) => exclusionOf(file, bounds) === undefined).sort()) {
+    const specPath = join(root, rel);
+    const folder = folderOf(root, specPath);
+    if (seen.has(folder)) continue;
+    seen.add(folder);
+    const text = readProjectText(specPath, "spec");
+    // Most specs declare none: the section heading is looked for before the spec is parsed.
+    if (!/^##\s*mirrors\s*$/im.test(text)) continue;
+    const specRel = relative(root, specPath).split(sep).join("/");
+    for (const mirror of parseSpec(text, specRel).mirrors) mirrors.push(modelMirror(root, folder, specRel, mirror));
+  }
+  return mirrors;
+}
+
 export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
@@ -327,7 +386,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.push(...ignoreProblems(root, walked));
   const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
-  for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
+  for (const specPath of walked.files.filter((rel) => modelFileKind(rel) === "spec").map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
     const rel = relative(root, specPath).split(sep).join("/");
     const existing = byFolder.get(folder);
@@ -342,7 +401,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
   const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
-  for (const rel of walked.files.filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+  for (const rel of walked.files.filter((f) => modelFileKind(f) === "practice").sort()) {
     const folder = folderOf(root, join(root, rel));
     const spec = byFolder.get(folder);
     if (spec === undefined) {
@@ -422,6 +481,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       }
       return { ...entrance, component: folder, file: found };
     });
+    const mirrors = (parsed.mirrors ?? []).map((mirror) => modelMirror(root, folder, specPath, mirror, problems));
     const paired = practiceFiles.get(folder);
     const practices = (paired?.parsed.practices ?? []).map((practice) => modelPractice(practice, `${folder}/${practice.name}`, folder, paired!.file, enactments));
     components.push({
@@ -432,6 +492,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       ...(parsed.owners === undefined ? {} : { owners: parsed.owners }),
       trustLevels: parsed.trustLevels,
       entrances,
+      mirrors,
       invariants,
       practicePath: paired?.file,
       practices,
@@ -737,6 +798,49 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
         ? `handler ${name} is declared at the top level of no source file under ${folder}`
         : `handler ${name} is not declared at the top level of ${file} (read under ${folder} and under the root)`,
   };
+}
+
+/** A file a spec names, read relative to the component's folder, then to the root, never above the root; undefined when neither exists. */
+function specNamedFile(root: string, folder: string, file: string): string | undefined {
+  const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
+  return candidates.find((candidate) => {
+    const path = resolve(root, candidate);
+    return existsSync(path) && statSync(path).isFile();
+  });
+}
+
+/**
+ * A mirror as the model holds it: the list's file and the recipe's files
+ * found, and a problem for each name or file that is gone, so a declaration
+ * cannot rot unseen (the edit-time alarm reports it at the edit too).
+ */
+export function modelMirror(root: string, folder: string, specPath: string, mirror: Mirror, problems: Problem[] = []): ModelMirror {
+  const declared = (name: string, file: string, role: string): string | undefined => {
+    const found = specNamedFile(root, folder, file);
+    if (found === undefined) {
+      problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${file} does not exist (read under ${folder} and under the root)` });
+      return undefined;
+    }
+    if (!declaresAtTop(readProjectText(resolve(root, found), "source"), name)) {
+      problems.push({ file: specPath, line: role === "list" ? mirror.line : mirror.recipeLine, message: `mirror ${mirror.name}: ${name} is not declared at the top level of ${found}; derive what was hand-kept, or remove the mirror` });
+      return undefined;
+    }
+    return found;
+  };
+  const listFile = declared(mirror.name, mirror.file, "list");
+  const sources: string[] = [];
+  const recipe = mirror.recipe;
+  if (recipe?.kind === "closure") {
+    for (const file of recipe.files) {
+      const found = specNamedFile(root, folder, file);
+      if (found === undefined) problems.push({ file: specPath, line: mirror.recipeLine, message: `mirror ${mirror.name}: closure of ${file}, which does not exist (read under ${folder} and under the root)` });
+      else sources.push(found);
+    }
+  } else if (recipe !== undefined) {
+    const found = declared(recipe.name, recipe.file, "partner");
+    if (found !== undefined) sources.push(found);
+  }
+  return { ...mirror, component: folder, spec: specPath, listFile, sources };
 }
 
 function countModel(components: Component[], problems: Problem[]): Counts {

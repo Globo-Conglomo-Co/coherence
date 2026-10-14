@@ -13,6 +13,7 @@ import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
+import { STORE_FOLDERS } from "../journal/stores.ts";
 import { DEFAULT_PROJECT_LEXICON, configuredName, effectiveConfig, leafOf, projectName, registryOf, under, type Registry } from "../adapters/project-config.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,27 +24,8 @@ export const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json
 export const CONFIG_FILE = "coherence.config.json";
 export { DEFAULT_PROJECT_LEXICON };
 
-export const HOSTS = ["claude", "codex"] as const;
-export type Host = (typeof HOSTS)[number];
-
-export function isHost(name: string): name is Host {
-  return (HOSTS as readonly string[]).includes(name);
-}
-
-/** The settings file each host reads, relative to the project root. */
-export const SETTINGS_FILE: Record<Host, string> = {
-  claude: ".claude/settings.json",
-  codex: ".codex/hooks.json",
-};
-
-/**
- * The personal settings file a host reads beside the shared one, relative to
- * the folder holding it, for a host that has one: Claude Code's is never
- * committed, and launched in a subfolder it reads the one at the git root.
- */
-export const LOCAL_SETTINGS_FILE: Partial<Record<Host, string>> = {
-  claude: ".claude/settings.local.json",
-};
+import { LOCAL_SETTINGS_FILE, SETTINGS_FILE } from "./hosts.ts";
+export { HOST_FOLDER, HOSTS, isHost, LOCAL_SETTINGS_FILE, SETTINGS_FILE, type Host } from "./hosts.ts";
 
 /** The harness's own name for the project directory, honored when it agrees with where the process runs. */
 export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
@@ -172,12 +154,13 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
 }
 
 /**
- * The record stores under .coherence: one append-only JSONL file per session,
- * whose readers order and fold records by their content, never by line. Two
- * branches append to the same session's file, so git merges each with the
- * union of both sides' lines (state-files.ts).
+ * The record stores' folders under .coherence: one append-only JSONL file per
+ * session, whose readers order and fold records by their content, never by
+ * line. Two branches append to the same session's file, so git merges each
+ * with the union of both sides' lines (state-files.ts). The stores are named
+ * once, in journal/stores.ts; this is that table's folders.
  */
-export const RECORD_STORES: readonly string[] = ["journal", "runs", "work"];
+export const RECORD_STORES: readonly string[] = STORE_FOLDERS;
 
 /** The folders under .coherence a project commits: the record stores, and the project's own hook voice. Everything else there is regenerated. */
 export const DURABLE_FOLDERS: readonly string[] = [...RECORD_STORES, "hooks"];

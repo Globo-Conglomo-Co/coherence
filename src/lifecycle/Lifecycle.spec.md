@@ -22,6 +22,10 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   handler: runHook in hook.ts
   trust: harness
 
+## mirrors
+- STATUS_TOOL_HOOKS in statusline.ts: the tool hooks the status line holds to the latency budget, kept apart because the status line imports nothing of Coherence's
+  mirrors: TOOL_HOOKS in hook-events.ts
+
 ## invariants
 - a subagent is told its own session: A subagent's start names its own session for every journal write and names its coordinator's session as one it never writes under; the main thread's start names no coordinator.
   over: a subagent start carrying the host's agent id beside its coordinator's session, and a main-thread start
@@ -378,9 +382,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: answered every project with npm's command whatever its lockfile -> "a newer release in the kept answer is named at the session start with the update command for the project's package manager and its release-age setting" went red in version.test.ts on its own assertion (pnpm-lock.yaml); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - the update check adds no wait to a hook: A session start asks the npm registry for the newest version only by spawning version --refresh detached, its output ignored and unreferenced, after its answer is made, and only when the last attempt is a day old or there was none, or the kept answer is older than the running release, which asks once; the attempt's time is kept before the child runs, no other event starts one, and COHERENCE_NO_UPDATE_CHECK, CI and DO_NOT_TRACK each start none.
+  protects: refreshLatest
+  chokepoint: versionCommand
   over: every hook event, each of the three refusals, a first session start, another within the day, and one a day later
   via: the check of the newest version starts detached at a session start at most once a day, and never under COHERENCE_NO_UPDATE_CHECK, CI or DO_NOT_TRACK
-  because: the network never runs in a hook's own time: the tool hooks hold a 3 s budget and a session start the user waits on; a request a day is what the answer is worth, and an adopter or CI that wants none says so with one variable
+  because: the network never runs in a hook's own time: the tool hooks hold a 3 s budget and a session start the user waits on; a request a day is what the answer is worth, and an adopter or CI that wants none says so with one variable; the registry is asked only by refreshLatest, which only the version verb reaches, so no hook can call it in its own time
   refuted: left the spawned check referenced, so the hook's process waits for it -> "the check of the newest version starts detached at a session start at most once a day, and never under COHERENCE_NO_UPDATE_CHECK, CI or DO_NOT_TRACK" went red in version.test.ts on its own assertion (the hook never holds the child); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - a failed update check keeps the last answer: A registry request that fails or answers no version is dropped: the last answer and when it came stay, only the attempt's time moves, and coherence version names the newest published version with when the registry said so, the attempt that got no answer, and whether the check is on.
@@ -449,9 +455,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: the return reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
+  protects: writeCursor
+  chokepoint: src/journal/feed.ts
   over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it
   via: the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded
-  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded
+  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded; the cursor is written only inside the feed module, whose commit the command line calls, so no hook can move it before the print
   crossing: harness -> record
   refuted: committed the cursor inside runHook, before the command line had written stdout -> "the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded" went red in hook.test.ts: with the host's end of the pipe closed the cursor had moved and the host had nothing; restored, green (2026-09-17)
   kinds: state
@@ -641,9 +649,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: two local files are read; no dependency is sampled
   checklist: declared-target-coverage dismissed: one file of each kind per event, not a registry of targets
 - a hook voice file stays inside the root: A hook voice file is read only where its real path lies inside the project root; a file, or a folder above it, that links outside is named as not read and never followed, an unreadable one is named, and in both cases the event's canonical text stands.
+  protects: HOOK_VOICE_DIR
+  chokepoint: voiceFile
   over: a file linked outside the root, the hooks folder linked outside it, a link that stays inside it, and a folder where the file should be, at SessionStart
   via: a hook voice file whose real path leaves the project root is named as not read and never followed
-  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent
+  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent; the voice folder is reached only by voiceFile, which follows a link only to see where it leads, so no other reader can follow one out
   crossing: project-source -> reading
   refuted: dropped the within check in voiceFile, so a file whose real path left the project root was read -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
   kinds: read
@@ -679,6 +689,30 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: one reader of written files serves both the practice triggers and revelation at the edit; resolving against the root instead of the command's folder would name the wrong file, and a path above the root is another project's
   crossing: harness -> reading
   refuted: resolved shell-written paths against the root instead of the folder the command runs in -> "writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- a tool that only reads is never a write: A tool host-tools.ts does not declare as writing files writes nothing, whatever path its input names, and routes by its cwd; only a shell command in its input is read for what it writes.
+  over: Read, NotebookRead, Glob, Grep, LS, Codex's view_image and read_file, an MCP server's read_file, Artifact, memory_read, a tool no release has yet naming file_path, path and notebook_path, and an undeclared tool running a command that writes and one that writes nothing
+  via: a tool not declared to write files writes nothing, whatever path its input names, unless a command in its input writes one
+  because: the hook once kept a list of reading tools and counted every other tool as a write, so each new reading tool (view_image, an MCP read_file, Artifact publishing a file) fired edit checks and edit-triggered practices and put files it only read into the session's write trace, silently; an allow list of writers fails toward missing a write a new tool makes, which the test beside it names for every declared tool, never toward inventing one
+  refuted: made writtenNames read file_path, notebook_path and path from any tool host-tools.ts does not declare, as the deny list did -> "a tool not declared to write files writes nothing, whatever path its input names, unless a command in its input writes one" went red in host-tools.test.ts on its own assertion (Read reads; it writes nothing); restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- every tool that writes is matched and read: Every tool host-tools.ts declares as writing files, for each agent host, is one the PreToolUse hook install writes runs for (Claude Code's matcher is derived from the declaration; Codex runs every tool), and the file it writes is read from its input the way the declaration says it names it: a field, a patch body, or a shell command, under its own name or a namespaced one.
+  over: every declared tool of Claude Code and of Codex, each spelling the file it writes its own way, and each under a namespace
+  via: every tool that writes files is matched by the hook install writes for its host and has the file it writes read from its input
+  because: the matcher, the tools that route by the files they name, and the hook's reading of a write were three hand lists that each had to name every writing tool, so a tool added to one and not another (PowerShell, Monitor) got no practice delivered before it ran and was routed by its cwd; one declaration they all derive from leaves nothing to keep in step
+  refuted: wrote the Claude Code matcher by hand again as Bash|Edit|Write|MultiEdit|NotebookEdit -> "every tool that writes files is matched by the hook install writes for its host and has the file it writes read from its input" went red in host-tools.test.ts on its own assertion (PowerShell and Monitor unmatched); restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- the read trace records only declared reading tools: The read trace records a file only for a tool host-tools.ts declares as reading, from the field the declaration names, and never for a tool that writes.
+  over: every declared reading tool of both agent hosts, a write of the same file, and a reading tool naming its file in another field
+  via: the read trace records a declared reading tool's file and no other tool's
+  because: trace.ts kept its own copy of the hook's reading tools, three names against the hook's eight, while saying it was the hook's set; reading the one declaration leaves no copy to fall behind
+  refuted: made readFileOf read file_path from any tool not declared as reading -> "the read trace records a declared reading tool's file and no other tool's" went red in host-tools.test.ts on its own assertion (a write is no read); restored (cmp), green batched and alone (2026-10-11)
+  kinds: none
+- a narrow PreToolUse matcher is named for reinstall: A Claude Code PreToolUse entry of Coherence's whose matcher leaves out a tool that writes files is named at every session start, one line per settings file with the tools it leaves out and the exact reinstall command, and the hook check says which tools it leaves out and to reinstall; a matcher at least as wide as the one install writes is never named so, and the reinstall replaces the entry rather than adding one.
+  over: the matcher 1.7.0 wrote, a matcher widened to every tool, and the reinstall
+  via: a PreToolUse matcher that leaves out a tool that writes is named by the check and at the session start with the reinstall, and a wider one is not
+  because: the matcher is written into the adopter's settings, so upgrading the package leaves the earlier one in place until the hooks are reinstalled, and a tool it leaves out gets no practice before it runs with nothing said; an adopter who widened it chose to run the hook for more tools, which loses nothing and must not be asked of them
+  refuted: made the session start judge a matcher against the five writing tools 1.7.0 knew, listed by hand -> "a PreToolUse matcher that leaves out a tool that writes is named by the check and at the session start with the reinstall, and a wider one is not" went red in install.test.ts on its own assertion (no line for the narrow matcher); restored (cmp), green batched and alone (2026-10-11)
   kinds: none
 
 - a turn's instrument is warmed before its stop: A session start and every prompt start warming the instrument in the background and never wait for it; no other event does in a project at the folder holding the hooks (a nested project's first tool use is the other, under entering a nested project warms its instrument).
@@ -1019,9 +1053,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: counted a run scoped by --invariant as a full run, and apart, counted a full run dated in the future -> "orient names an invariant floor no full run has graded in fourteen days; a scoped run and a run dated in the future move nothing" went red in defect-orient.test.ts on its own assertion each time (a scoped run held the note off; a run dated 2099 held it off); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - telemetry is sent only on opt-in: Fleet telemetry queues and sends nothing until the user runs telemetry on, which keeps the choice and a random installation id under the user's config directory, never in the project; DO_NOT_TRACK, COHERENCE_TELEMETRY=0, a build with no PostHog key, and a project's or its registry's "telemetry": false each refuse whatever the user chose, and off forgets the id and drops the queue.
+  protects: FETCH_SENDER
+  chokepoint: flushQueue
   over: a user who never opted in, one who did, each environment override, a build with no key, a project that refuses, and an opt-out with events queued
   via: nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins
-  because: Coherence runs in other people's code, so the widest self-correction loop may learn from an installation only when its user chose it, and a project or a machine that says no must be heard over any one user's yes (d-c00e7997)
+  because: Coherence runs in other people's code, so the widest self-correction loop may learn from an installation only when its user chose it, and a project or a machine that says no must be heard over any one user's yes (d-c00e7997); the one function that reaches the network is used only by the flush, which sends nothing unless telemetry is on
   refuted: telemetryState ignored a project's "telemetry": false -> "nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins" went red in telemetry.test.ts on its own assertion (a project's "telemetry": false refuses); restored byte for byte, green batched and alone (2026-10-07)
   kinds: output
   checklist: destination-confinement dismissed: events go to one destination, the batch endpoint of the host in telemetry-config.ts, and a redirect is refused
@@ -1052,9 +1088,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: one attempt per flush with a 5 s timeout and no retry, so a failing PostHog costs one request per session start or stop
   checklist: declared-target-coverage dismissed: one target, PostHog's batch endpoint, not a registry of targets
 - telemetry adds no wait to a hook: A hook starts telemetry only at a session start or a stop, after its answer is made, and only by spawning the flush detached with its output ignored and unreferenced, when something is queued or a session that is over awaits its summary; queuing an event appends one line and reads nothing back; the send happens in the detached flush, one request with a timeout, dropped after one attempt.
+  protects: flushQueue
+  chokepoint: telemetryCommand
   over: every hook event with telemetry on, an empty queue, a queued event, a session that is over, and a queue of 500 events taking one more
   via: telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line
-  because: the tool hooks hold a 3 s latency budget and run around every tool call; a send inside a hook would make the network's latency the user's, and a non-writing PostToolUse on this repository measured 191 ms with telemetry on against 192 ms with it off
+  because: the tool hooks hold a 3 s latency budget and run around every tool call; a send inside a hook would make the network's latency the user's, and a non-writing PostToolUse on this repository measured 191 ms with telemetry on against 192 ms with it off; the send is reached only through the telemetry verb's flush, which the hook starts detached, so no hook can call it in its own time
   refuted: startTelemetry left the flush referenced, so the hook's process waits for it -> "telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line" went red in telemetry.test.ts on its own assertion (the hook never holds the child); restored byte for byte, green batched and alone (2026-10-07)
   kinds: budget
   checklist: execution-budget declared as telemetry adds no wait to a hook
@@ -1176,4 +1214,87 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: ci report carries each project's problems, chokepoint verdicts, spec gaps and guard failures as Markdown, and fails only when Coherence did not finish
   because: in the comment mode, findings are reported and never fail the job, while a run that never happened is never mistaken for a clean one; a report read from the latest verdicts instead of the session's run would show a pass from another branch
   refuted: buildReport read every run in each project instead of the CI session's, so another session's later pass hid the failing verdict -> "ci report carries each project's problems, chokepoint verdicts, spec gaps and guard failures as Markdown, and fails only when Coherence did not finish" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
+  kinds: none
+- a closure mirror is named at the edit that breaks it: At PostToolUse, a write to a file in the value-import closure a declared mirror names is read again, and each file the closure now reaches that the list does not name is added to the edit's context as advice, never a block, naming the file that imports it and the list's file and line; a type-only import adds nothing, and the file the closure grew by is watched from then on.
+  over: a fixture of the b37627e shape: a list of the page's modules, the closure of page.ts, a type-only import added to a closure file, then a value import of a file the list omits
+  via: an edit that gives a closure file a value import its mirror omits names the file and the list's line, as advice
+  because: BROWSER_SOURCES was a hand list of the Scope page's modules; b37627e made structure-flow.ts import languages-read.ts without adding it, and releases 1.6.0 to 1.7.1 shipped a page stuck on Connecting; the edit that broke it was the one moment the mismatch was cheap to see (d-f1ff87d6)
+  crossing: project-source -> reading
+  refuted: made the closure check count only the closure's starting files as missing -> "an edit that gives a closure file a value import its mirror omits names the file and the list's line, as advice" went red in mirrors.test.ts on its own assertion (the import of languages-read.ts went unnamed); restored byte for byte, green (2026-10-12)
+  kinds: none
+- a literal mirror is named at the edit that breaks it: At PostToolUse, a write to a declared mirror's list or to its partner literal reads both again, and when their members differ (another literal's members, or an object's keys) the edit's context names what each side holds alone and both files and lines, as advice; the same disagreement is said once per session, and agreeing again is silent and forgets it.
+  over: a list and its partner literal, and a set and an object's keys, changed on either side, an unrelated change to a file that still disagrees, and a fix
+  via: an edit that makes a list and its partner literal disagree names what each side holds alone, once per session
+  because: two literals kept equal by hand drift without failing anything (defect family hand-list); naming the drift at the edit that made it is the cheap moment, and saying a standing drift at every later edit of a busy file would train a reader to skip the line
+  crossing: project-source -> reading
+  refuted: said every disagreement at every watched edit, ignoring what the session was told -> "an edit that makes a list and its partner literal disagree names what each side holds alone, once per session" went red in mirrors.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
+  kinds: none
+- a gone mirror is said at the edit: A write to a file a declared mirror spans, after which its list or partner literal is no longer declared as a literal there, adds a line to the edit's context saying the mirror cannot be checked and why, and the spec model names the same mirror as a problem; a mirror is never skipped in silence.
+  over: a mirror whose list is removed from its file by an edit
+  via: a mirror whose list is gone is said at the edit and is a spec problem, never skipped
+  because: a check that skips what it cannot find reads as a clean edit; a hand list derived away leaves a declaration that names nothing, and both the edit and spec --check must say so
+  crossing: project-source -> reading
+  refuted: read a list no longer declared as a literal as agreeing -> "a mirror whose list is gone is said at the edit and is a spec problem, never skipped" went red in mirrors.test.ts on its own assertion (the edit said nothing); restored byte for byte, green (2026-10-12)
+  kinds: none
+- the mirror alarm costs an unwatched edit one lookup: At PostToolUse, an edit to no file a declared mirror spans costs the alarm one read of the kept index and a lookup, and reads no source file; a watched edit reads the list, its partner, and only the closure files whose size or modification time changed, never loading the TypeScript compiler.
+  over: an edit to a file no mirror spans and an edit to a closure file, timed and counted by the work meter
+  via: an edit no mirror watches costs the alarm one lookup and reads no source
+  because: the tool hooks share a 3 s budget around every tool call; the spike measured 155 ms to load TypeScript and 29 ms to parse one file, where a regex over the literal and the imports takes under a millisecond (d-164b52ef)
+  crossing: project-source -> reading
+  refuted: read every declared mirror again at every edit, whatever file it wrote -> "an edit no mirror watches costs the alarm one lookup and reads no source" went red in mirrors.test.ts on its own assertion (an unwatched edit read the fixture's sources); restored byte for byte, green (2026-10-12)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on what one edit reads
+  checklist: execution-budget declared as the mirror alarm costs an unwatched edit one lookup
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, not on allocation
+  checklist: circuit-breaker-policy dismissed: the alarm has no dependency to fail
+- the warm hook process answers as the hook does: coherence hook-serve answers each event with the stdout, stderr and exit code coherence hook <event> prints for it, in arrival order, one event at a time, and keeps the same records, committed once its answer was written.
+  over: a session's start, prompt, edit (before and after), read and stop, through one hook-serve process and through one hook process per event, in two copies of one project
+  via: the warm process answers a session's events with the per-event hook's output and keeps the same records
+  because: the Claude Code mod (mods/coherence, docs/mods-spike.md) reaches Coherence through this process to spare each event Node's start; an answer or a record that differed would make the fast path a different tool from the one Codex and the settings hooks run
+  refuted: dropped the commit after hook-serve writes its answer -> "the warm process answers a session's events with the per-event hook's output and keeps the same records" went red in hook-serve.test.ts: the warm copy lacked .coherence/.gitattributes and the session's lexicon, regulate and structure records; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process never answers from stale code: hook-serve compares Coherence's code on disk with what it loaded before every request; once they differ it answers stale, runs nothing, and exits, so its client runs the event through the command line and starts a fresh process.
+  over: a ping, then an event after the code identity changed
+  via: a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line
+  because: a long-lived process outlives an edit to Coherence itself (its own repository dogfoods it) or an upgrade; the per-event hook always runs the code on disk, and the warm one must not answer differently
+  refuted: compared the code identity with itself instead of with what was loaded -> "a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line" went red in hook-serve.test.ts; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process leaves with its socket: hook-serve --socket listens in a private folder of its own, prints the socket's path first, and when its host ends it with a signal it exits 0 and removes the folder, so a client's next request fails at once and the client falls back.
+  over: a ping over the socket, the host's SIGTERM, and a request after it
+  via: over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace
+  because: a socket left behind would make a dead process look alive to the mod, and a folder left in the temporary directory is litter per session
+  refuted: removed the signal handlers -> "over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace" went red in hook-serve.test.ts: the process ended by the signal without exiting 0; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the mod is Coherence's own: Coherence's repository is the marketplace for its Claude Code mod and lists it at the package's version, and the tools whose PreToolUse the mod answers are generated from host-tools.ts's writers, never kept by hand.
+  over: package.json's version, the mod's manifest, the marketplace file, and the mod's writers file against host-tools.ts
+  via: the repository's marketplace lists the mod at the package's version, and the mod's writer tools are host-tools.ts's
+  because: a second list of the writing tools is a hand list, which drifted once already (the mod had five of host-tools.ts's seven); and Claude Code updates a plugin by its version, so a mod whose version stood still would never reach anyone
+  kinds: none
+- the mod installs for one person from Coherence's repository: coherence hooks install --host claude --mod registers Coherence's repository as a marketplace and installs the mod, both at Claude Code's personal scope, then removes Coherence's personal settings hooks, keeps the committed ones and names each event they still hold back; uninstall takes the mod out first and drops only the marketplace declaration install wrote, never the marketplace itself. In a git worktree the personal settings it reads and edits are the main checkout's, where Claude Code's personal scope keeps them.
+  over: a project with committed and personal hooks, a claude on the PATH that writes the personal settings as Claude Code's plugin commands do, a step that fails, and a worktree of the project
+  via: hooks install --mod installs the mod at the personal scope from Coherence's repository, hands it the personal hooks, keeps the team's and names them, and uninstall takes out the mod and its declaration alone
+  because: Claude Code knows a marketplace by its name on the whole machine, so registering a project's node_modules folder repointed every other project's mod at it, and removing the marketplace uninstalled the mod from every project (both seen on 2.1.295), and in a worktree its personal scope wrote the main checkout's file; the repository is one source for every project, and the mod runs each project's own Coherence; the fast path is opt-in, so it is personal, and the committed hooks are the team's to remove; the mod stands aside for any event a settings hook of Coherence's covers, so a personal hook left in place would leave it nothing to answer
+  kinds: none
+- the mod can be the team's: coherence hooks install --host claude --mod --shared registers Coherence's repository as a marketplace and installs the mod in the committed settings, then removes Coherence's committed Claude Code hooks and keeps every other host's; hooks --check and status read the mod there as answering every event, and uninstall takes it out and drops only the declaration install wrote.
+  over: a project with committed Claude Code and Codex hooks, a claude on the PATH that writes each scope's settings as Claude Code's plugin commands do, --shared without --mod, the check and status, and the uninstall
+  via: hooks install --mod --shared enables the mod in the committed settings in place of the committed Claude Code hooks, keeps the other host's, and uninstall takes it out
+  because: a team that wants every member on the warm path, Coherence's own repository first, would otherwise hand-edit the committed settings, and the check would then call the missing hooks drift; the mod stands aside for every event a settings hook of Coherence's covers, so committed hooks left beside it would hold it back for everyone
+  kinds: none
+- Coherence's own repository runs its own mod: In Claude Code, Coherence's own repository runs each tree's own mods/coherence, linked from the project's skills folder, so the main checkout and every worktree run their own mod and Claude Code reloads it when a file of it is saved; its committed settings carry no Coherence hook and no installed copy, hooks --check says which mod runs and names an installed copy that would take the mod's name first, and hooks install --mod is refused there.
+  over: the repository's own checkout: its skills-folder link, its committed settings, the check, and an install of the mod
+  via: Coherence's own repository runs each tree's own mod from its skills folder, never an installed copy, and Codex through its start hooks
+  because: developing the mod needs the tree's own code reloaded on save, which a copy installed from the marketplace never is; Claude Code loads a plugin from the project's skills folder and watches it, but refuses it when an installed plugin already has the name (seen on 2.1.295), so a copy installed for this repository would silently run in its place
+  kinds: none
+- the mod keeps Coherence's own files: While Coherence's mod is enabled, uninstalling the last settings hook of Coherence's keeps .coherence/.gitignore and .coherence/.gitattributes, because a host still runs Coherence.
+  over: a project whose committed hooks are removed while its personal settings enable the mod
+  via: while the mod is the only thing running Coherence, removing the last settings hook keeps .coherence's own files
+  because: those files keep git from seeing Coherence's regenerated state and let two branches' records merge; the mod writes the same records the hooks do, so removing them while it runs would put the state in front of git again
+  kinds: none
+- a shared list is declared once: The hook events, the tool hooks, the agent hosts, the lockfiles and the package manager each names, the lexicon proposal actions, the sense review dispositions, the plural rules the vocabulary readers undo, and the interface budget flags are each declared in one module; telemetry's events and hosts, the latency budget, the benchmarks, ci install, the update line, the vocabulary check's excluded files, the lexicon verbs and their usage, lexicon coverage and every command that takes the budget flags read them from there, and the lexicon operations doc's lists are held equal to them.
+  over: telemetry's summary events and hosts, a lockfile of each manager in a repository, the lexicon verbs' usage and docs/lexicon-operations.md, plural words read by both vocabulary readers, the usage of every command taking the budget flags and the partial map's advice; and every source module, CI script and benchmark, scanned for one of the lists written out as an array, a literal union or an alternation, a lockfile named by hand, or a plural rule of its own
+  via: every list the hooks, telemetry, ci, the update line and the lexicon verbs share is read from the one module that declares it, and its usage and docs name exactly its members
+  because: telemetry kept the hook events and hosts beside the hook's own, the latency budget, the status line and the scale benchmark each kept the tool hooks, ci and the update line each kept a lockfile table, lexicon-cli checked proposals against a copy of the Change type's actions and the dispositions were written out in the verb, the reviewer and the usage, the check and coverage each kept the plural rules, and three commands each spelled the budget flags; a value added to one would be summarized as nothing, refused, read as a different word or not parsed, and nothing would fail
+  refuted: gave telemetry its own literal list of the hook events again, SUMMARY_EVENTS written out in place of HOOK_EVENTS -> "every list the hooks, telemetry, ci, the update line and the lexicon verbs share is read from the one module that declares it, and its usage and docs name exactly its members" went red in declared-once.test.ts on its own assertion; restored (cmp), green batched and alone (2026-10-12)
   kinds: none

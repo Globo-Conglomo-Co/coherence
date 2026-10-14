@@ -30,9 +30,10 @@ import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { keptLine } from "./kept-answers.ts";
+import { adapterCode, keptLine } from "./kept-answers.ts";
 import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
+import { bothWays, sameMap } from "./both-ways.ts";
 import { checked, routedProject } from "./routed-fixture.ts";
 import { scopedUnsettled } from "./scoped-route.ts";
 import { renderView } from "./shell.ts";
@@ -173,28 +174,6 @@ test("a name no other component spells is never asked for its references", async
   }
 });
 
-/** Read a project exhaustively and through the prefilter on one server; both readings, and the server closed. */
-async function bothWays(adapter: LanguageAdapter, root: string): Promise<{ exhaustive: InterfaceReading; filtered: InterfaceReading }> {
-  try {
-    // Neither keeps answers: the filtered reading must ask the server itself for what the prefilter lets through.
-    const exhaustive = await readComponentInterfaces(root, adapter, { exhaustive: true, keep: false });
-    const filtered = await readComponentInterfaces(root, adapter, { keep: false });
-    return { exhaustive, filtered };
-  } finally {
-    await adapter.close();
-  }
-}
-
-function sameMap(exhaustive: InterfaceReading, filtered: InterfaceReading, what: string): void {
-  assert.equal(filtered.kind, "read", what);
-  assert.equal(exhaustive.kind, "read", what);
-  if (filtered.kind !== "read" || exhaustive.kind !== "read") return;
-  assert.deepEqual(filtered.symbols, exhaustive.symbols, `${what}: the same component interfaces, symbols and site counts`);
-  assert.deepEqual(filtered.entrances, exhaustive.entrances, `${what}: the same entrances and reaches`);
-  assert.equal(filtered.declarations, exhaustive.declarations, what);
-  assert.deepEqual(filtered.unowned, exhaustive.unowned, what);
-}
-
 const TS_CONFIG = JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] });
 
 test("the prefilter never hides a cross-component reference", { timeout: 600_000 }, async (t) => {
@@ -246,13 +225,7 @@ test("the prefilter never hides a cross-component reference", { timeout: 600_000
     ts.remove();
     py.remove();
   }
-  // Coherence's own tree, read both ways through one warm server.
-  const own = await bothWays(new TypeScriptAdapter(COHERENCE_ROOT), COHERENCE_ROOT);
-  if (own.filtered.kind === "unread") t.diagnostic(`no TypeScript instrument for Coherence's tree: ${own.filtered.because}`);
-  else {
-    sameMap(own.exhaustive, own.filtered, "Coherence's own tree");
-    assert.ok(own.filtered.kind === "read" && own.filtered.symbols.length > 100, "a real map, not an empty one");
-  }
+  // Coherence's own tree, read both ways, is bench/interfaces/own-tree.ts in the bench job: it reads the whole tree twice, so it would cost the unit suite more with every merge.
 });
 
 test("the interface reading is bounded in time and says when it is partial", { timeout: 30_000 }, async () => {
@@ -441,4 +414,18 @@ test("kept answers are never used silently: when what the server's answers rest 
   } finally {
     remove();
   }
+});
+
+test("the kept answers rest on every module the language adapters reach: their entry and each module any of them imports, wherever it lives", () => {
+  const code = adapterCode();
+  const held = new Set(code);
+  const src = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  assert.ok(held.has(join(src, "adapters", "index.ts")), "the adapters' entry");
+  for (const file of code) {
+    for (const [, specifier] of readFileSync(file, "utf8").matchAll(/^(?:import|export)\s[^;]*?\sfrom\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
+      const target = resolve(dirname(file), specifier!);
+      assert.ok(held.has(target), `${file} imports ${specifier}, so a change to it may change an answer`);
+    }
+  }
+  for (const reached of ["adapters/installed.ts", "adapters/tach.ts", "adapters/toml.ts", "adapters/project-config.ts", "lifecycle/work-meter.ts"]) assert.ok(held.has(join(src, reached)), reached);
 });

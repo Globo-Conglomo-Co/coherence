@@ -82,8 +82,6 @@ import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
-import { resolveDotted } from "../../adapters/python.ts";
-import { specifierCandidates } from "../../adapters/typescript.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
@@ -91,10 +89,39 @@ import { languagesRead } from "./languages-read.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
+import { PYTHON_INTERFACES } from "./python-scope.ts";
+import { TYPESCRIPT_INTERFACES } from "./typescript-scope.ts";
+
+/**
+ * What the reading knows of one language's syntax without its server, each
+ * language's in its own module (typescript-scope.ts, python-scope.ts): a
+ * language INTERFACE_SYNTAX lacks fails to compile, never reads as another
+ * language.
+ */
+export interface InterfaceSyntax {
+  /** Whether a declaration line declares a type only (an interface or a type alias). */
+  isTypeDeclaration(line: string): boolean;
+  /** Whether a declaration line is its module's default export. */
+  isDefaultExport(line: string): boolean;
+  /** Whether the language's server narrows to bounds, so a reader that keeps one warm starts a bounded one of its own. */
+  serverBounds: boolean;
+  /** The import and export lists a file's text holds, each the text its `original as alias` renames are read from. */
+  importLists(text: string): string[];
+  /** The names a file's text exports as a default by name. */
+  defaultNames(text: string): string[];
+  /** The module files a file star-imports or wildcard re-exports, in every spelling the word index keys them by. */
+  wildcardModules(file: string, text: string): string[];
+}
+
+/** Each language's syntax for the reading: one key per language, so a new one is one module and one key here. */
+const INTERFACE_SYNTAX: Record<Language, InterfaceSyntax> = {
+  typescript: TYPESCRIPT_INTERFACES,
+  python: PYTHON_INTERFACES,
+};
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
-export function isTypeDeclaration(line: string, language: string): boolean {
-  return language === "typescript" && /^(?:export\s+)?(?:declare\s+)?(?:interface|type)\s/.test(line.trim());
+export function isTypeDeclaration(line: string, language: Language): boolean {
+  return INTERFACE_SYNTAX[language].isTypeDeclaration(line);
 }
 
 interface ReachNode {
@@ -234,7 +261,7 @@ export const HEAP_HEADROOM_MB = 2048;
  */
 export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
   const ignore = configIgnore(root);
-  if (language !== "python" || ignore.length === 0) return undefined;
+  if (!INTERFACE_SYNTAX[language].serverBounds || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
 }
 
@@ -261,15 +288,7 @@ function componentCodeOf(model: SpecModel, file: string, language: Language, ski
 /* ------------------------------------------------------- the word index */
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-/** A TypeScript import or export list: `import { a as b } from`, `export { a as b }`, `export type { … }`. */
-const TS_LIST = /\b(?:import|export)\s+(?:type\s+)?(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}/g;
-/** A Python import statement, a parenthesized list or one logical line: `import a as b`, `from m import (a as b, c)`. */
-const PY_IMPORT = /^[ \t]*(?:from\s+\S+\s+)?import\s+(\([^)]*\)|[^\n]*(?:\\\n[^\n]*)*)/gm;
 const ALIAS = /([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)/g;
-/** A TypeScript default export by name: `export default foo;`, `export = foo`, `export { foo as default }` is read as an alias to "default". */
-const TS_DEFAULT_NAME = /^export\s+(?:default\s+|=\s*)([A-Za-z_$][\w$]*)\s*;?\s*$/gm;
-const TS_WILDCARD = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/gm;
-const PY_STAR = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/gm;
 
 /**
  * What the prefilter knows about the component code's text: which
@@ -295,6 +314,7 @@ export interface WordIndex {
 /** The word index over the component code, each file with the component it belongs to. */
 export function wordIndex(root: string, code: ReadonlyMap<string, string>, language: Language, read: (file: string) => string = (file) => readFileSync(join(root, file), "utf8")): WordIndex {
   const files = [...code.keys()].sort();
+  const syntax = INTERFACE_SYNTAX[language];
   const owners = new Map<string, Set<string>>();
   const where = new Map<string, Map<number, number>>();
   const direct = new Map<string, Set<string>>();
@@ -304,6 +324,13 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
     const set = map.get(key) ?? new Set<V>();
     set.add(value);
     map.set(key, set);
+  };
+  // An import list's renames: `original as alias`, a default import kept apart.
+  const aliasesIn = (list: string): void => {
+    for (const [, original, alias] of list.matchAll(ALIAS)) {
+      if (alias === "default") defaults.add(original!);
+      else add(direct, original!, alias!);
+    }
   };
   files.forEach((file, index) => {
     const owner = code.get(file)!;
@@ -321,26 +348,9 @@ export function wordIndex(root: string, code: ReadonlyMap<string, string>, langu
       files.set(index, count);
       where.set(token, files);
     }
-    const lists = language === "typescript" ? [...text.matchAll(TS_LIST)].map((m) => m[1]!) : [...text.matchAll(PY_IMPORT)].map((m) => m[1]!);
-    for (const list of lists) {
-      for (const [, original, alias] of list.matchAll(ALIAS)) {
-        if (alias === "default") defaults.add(original!);
-        else add(direct, original!, alias!);
-      }
-    }
-    if (language === "typescript") {
-      for (const [, name] of text.matchAll(TS_DEFAULT_NAME)) defaults.add(name!);
-      for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        for (const candidate of specifierCandidates(file, specifier!)) add(wildcards, candidate, owner);
-      }
-    } else {
-      for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
-        const target = resolveDotted(file, dots!, dotted!);
-        if (target === undefined) continue;
-        add(wildcards, `${target}.py`, owner);
-        add(wildcards, `${target}/__init__.py`, owner);
-      }
-    }
+    for (const list of syntax.importLists(text)) aliasesIn(list);
+    for (const name of syntax.defaultNames(text)) defaults.add(name);
+    for (const module of syntax.wildcardModules(file, text)) add(wildcards, module, owner);
   });
   // Every name an alias chain reaches, so a caller that spells only the last alias still counts.
   const aliases = new Map<string, Set<string>>();
@@ -432,13 +442,22 @@ export function configuredBudget(root: string): InterfaceBudget {
   return budget;
 }
 
-/** The flags that override the budget for one reading, as the scope and query commands take them. */
-export const BUDGET_FLAGS = "[--interface-seconds <n>] [--interface-memory <MB>]";
+/** Each flag that overrides the budget for one reading, the budget key it sets, and its value as usage names it. */
+const BUDGET_FLAG_TABLE = [
+  { flag: "interface-seconds", key: "seconds", value: "<n>" },
+  { flag: "interface-memory", key: "memoryMB", value: "<MB>" },
+] as const satisfies readonly { flag: string; key: keyof InterfaceBudget; value: string }[];
 
-/** The budget the flags `--interface-seconds` and `--interface-memory` give, or why a value is refused. */
+/** The budget flags' names, as every command that takes them parses them. */
+export const BUDGET_FLAG_NAMES: readonly string[] = BUDGET_FLAG_TABLE.map((f) => f.flag);
+
+/** The flags that override the budget for one reading, as the scope, query and scaffold commands' usage writes them. */
+export const BUDGET_FLAGS = BUDGET_FLAG_TABLE.map((f) => `[--${f.flag} ${f.value}]`).join(" ");
+
+/** The budget the budget flags give, or why a value is refused. */
 export function budgetFlags(values: ReadonlyMap<string, string>): Partial<InterfaceBudget> | string {
   const budget: Partial<InterfaceBudget> = {};
-  for (const [flag, key] of [["interface-seconds", "seconds"], ["interface-memory", "memoryMB"]] as const) {
+  for (const { flag, key } of BUDGET_FLAG_TABLE) {
     const value = values.get(flag);
     if (value === undefined) continue;
     const n = Number(value);
@@ -844,7 +863,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
         const line = lines[declaration.line - 1] ?? "";
         const type = isTypeDeclaration(line, language);
         const id = `${file}#${declaration.name}`;
-        const isDefault = language === "typescript" && /^export\s+default\s/.test(line.trim());
+        const isDefault = INTERFACE_SYNTAX[language].isDefaultExport(line);
         declared.push({ id, component: owner, name: declaration.name, file, type, exported: declaration.exported, isDefault });
         nodes.set(id, { component: owner, name: declaration.name, file, type });
         if (declaration.exported) declarations += 1;

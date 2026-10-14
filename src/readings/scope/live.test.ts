@@ -5,20 +5,24 @@
  */
 
 import assert from "node:assert/strict";
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
+import { closeWork, openWork } from "../../lifecycle/work-meter.ts";
+import { CONFIG_FILE, loadSpecModel } from "../../spec/model.ts";
 import { scopeState } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
-import { scopeApp } from "./live.ts";
-import type { JournalRecord, RunRecord, ShellState } from "./model.ts";
+import { scopeApp, storeOf, watchedLexicons } from "./live.ts";
+import type { JournalRecord, PageEntry, RecordedSite, RunRecord, ShellState } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
-import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
+import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, mergeSites, parseStream, runKeyOf, type StreamEvent } from "./updates.ts";
 
 interface Live {
   serving: Serving;
@@ -207,6 +211,13 @@ test("the first load stays flat as the journal and the runs grow, every derived 
       const run = (i: number): string => JSON.stringify({ at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [{ component: "src/store", name: "read shape", form: "totality oracle", verdict: "pass", mode: "batched", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "1 test passed" }] });
       appendFileSync(join(grown.root, `.coherence/runs/${session}.jsonl`), Array.from({ length: runs }, (_, i) => run(i)).join("\n") + "\n");
     };
+    // The chokepoint's latest check, with more reference sites each time: the code grows as well as the stores.
+    const check = (sites: number, phase: number): RecordedSite[] => {
+      const recorded = Array.from({ length: sites }, (_, i): RecordedSite => ({ file: i % 3 === 0 ? "src/api/handler.test.ts" : "src/api/handler.ts", line: i + 1, symbol: `caller${i}`, class: i % 3 === 0 ? "test" : "chokepoint-reference", of: "chokepoint", test: i % 3 === 0 }));
+      const entry = { component: "src/store", name: "single writer", form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "every write passes the door", sites: recorded };
+      appendFileSync(join(grown.root, `.coherence/runs/s-check.jsonl`), JSON.stringify({ at: new Date(Date.UTC(2026, 8, 13) + phase * 1000).toISOString(), session: "s-check", agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [entry] }) + "\n");
+      return recorded;
+    };
     const firstLoadBytes = async (): Promise<{ bytes: number; state: ShellState; server: Live }> => {
       const server = await live(grown.root);
       const response = await fetch(`${server.base}/api/state`, { headers: { authorization: `Bearer ${server.token}` } });
@@ -216,12 +227,14 @@ test("the first load stays flat as the journal and the runs grow, every derived 
       return { bytes: Buffer.byteLength(text, "utf8"), state: first.state, server };
     };
     grow(400, 60, 0);
+    check(800, 0);
     const small = await firstLoadBytes();
     await small.server.stop();
     grow(2000, 300, 400);
+    const sites = check(8000, 1);
     const large = await firstLoadBytes();
     try {
-      assert.ok(Math.abs(large.bytes - small.bytes) < 1024, `the first load stays flat: ${small.bytes} bytes, then ${large.bytes} after 2000 records and 300 runs more`);
+      assert.ok(Math.abs(large.bytes - small.bytes) < 1024, `the first load stays flat: ${small.bytes} bytes, then ${large.bytes} after 2000 records, 300 runs and 7200 reference sites more`);
       const state = large.state;
       const allJournal = loadJournal(grown.root).records;
       const allRuns = loadRuns(grown.root).records;
@@ -229,6 +242,13 @@ test("the first load stays flat as the journal and the runs grow, every derived 
       assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), allRuns.length, "every run is loaded or counted");
       assert.ok(state.journal.records.some((r) => r.id === grown.names.openEscalation), "an open escalation is in the first load however old");
       const whole = await scopeState({ root: grown.root, lexiconPath: COHERENCE_LEXICON, project: "Fixture", window: false });
+      // The reference sites the first load counted and did not list load by their run and enforcement, every one.
+      const latestCheck = state.runs.records.find((r) => r.session === "s-check" && r.at === new Date(Date.UTC(2026, 8, 13) + 1000).toISOString())!;
+      const carried = latestCheck.invariants[0] as PageEntry;
+      assert.ok(carried.sites!.length < sites.length && carried.sitesLeft !== undefined, `the first load lists ${carried.sites!.length} of ${sites.length} sites and counts the rest`);
+      const answer = (await large.server.get(`/api/sites?run=${encodeURIComponent(runKeyOf(latestCheck))}&component=src%2Fstore&name=single%20writer`)) as { sites: RecordedSite[] };
+      assert.deepEqual(answer.sites, sites, "the live page's server answers every site of the entry");
+      assert.ok(mergeSites(state, runKeyOf(latestCheck), "src/store", "single writer", answer.sites));
       for (const invariant of whole.spec.components.flatMap((c) => c.invariants)) {
         assert.deepEqual(latestOf(invariant, state.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the first load derives the same latest verdicts`);
       }
@@ -260,5 +280,31 @@ test("the first load stays flat as the journal and the runs grow, every derived 
     }
   } finally {
     grown.remove();
+  }
+});
+
+test("every file the spec model reads by name refreshes the live reading: each spec and practice file it read for this repository, and the config", async () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const scope = openWork();
+  try {
+    loadSpecModel(root, { runs: false });
+  } finally {
+    closeWork(scope);
+  }
+  const named = scope.work.reads.filter((read) => read.startsWith("spec ") || read.startsWith("practice ")).map((read) => relative(root, read.slice(read.indexOf(" ") + 1)));
+  assert.ok(named.some((file) => file.endsWith(".practice.md")), "the model read a practice file");
+  for (const file of named) assert.equal(storeOf(file, []), "model", `${file} is read by the model, so a change to it refreshes the reading`);
+  assert.equal(storeOf(CONFIG_FILE, []), "model");
+  assert.equal(storeOf("src/widget/Widget.practice.md", []), "model", "a practice file not yet written refreshes the reading once it is");
+  assert.equal(storeOf("src/widget/widget.ts", []), undefined, "a source file is no file the model reads by name");
+  // The lexicons are located as the state's load locates them: a config that names one elsewhere is followed.
+  const project = mkdtempSync(join(tmpdir(), "coherence-live-lexicon-"));
+  try {
+    writeFileSync(join(project, CONFIG_FILE), JSON.stringify({ lexicon: "vocab/terms.json" }));
+    const lexicons = await watchedLexicons(project, { lexiconPath: COHERENCE_LEXICON });
+    assert.equal(storeOf("vocab/terms.json", lexicons), "model", "the lexicon the config names refreshes the reading");
+    assert.equal(storeOf("lexicon.json", lexicons), "model", "and one written later at the default name");
+  } finally {
+    rmSync(project, { recursive: true, force: true });
   }
 });

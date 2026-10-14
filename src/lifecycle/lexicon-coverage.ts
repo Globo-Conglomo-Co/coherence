@@ -36,10 +36,13 @@
  */
 import { existsSync, realpathSync } from "node:fs";
 import { exclusionOf, projectFilesEnding, walkBounds } from "../adapters/project-files.ts";
+import type { Language } from "../adapters/index.ts";
+import { languageOfFile } from "../adapters/language-files.ts";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
+import { recordWords } from "../journal/record.ts";
 import { countWork } from "./work-meter.ts";
 import {
   corpusFiles,
@@ -57,6 +60,7 @@ import {
 import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from "./project.ts";
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { singularForms } from "./inflection.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
 
 export { proseNominations };
@@ -223,18 +227,9 @@ function table(
   }
 }
 
-/** The singulars a word may be the plural of, as the reading merges a plural into its singular. */
-export function singularForms(word: string): string[] {
-  return singular(word);
-}
-
-function singular(word: string): string[] {
-  const out: string[] = [];
-  if (word.endsWith("ies") && word.length > 4) out.push(word.slice(0, -3) + "y");
-  if (/(?:ss|sh|ch|x|z)es$/.test(word)) out.push(word.slice(0, -2));
-  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) out.push(word.slice(0, -1));
-  return out;
-}
+/** The singulars a word may be the plural of, as the reading merges a plural into its singular: the check's own rules (inflection.ts). */
+export { singularForms };
+const singular = singularForms;
 
 /** Inflection is accepted only when its conservative singular is an already-known complete name. */
 function knownMeaning(term: string, known: Map<string, KnownMeaning>): KnownMeaning | undefined {
@@ -298,15 +293,27 @@ function declaredName(line: string): string | undefined {
   return undefined;
 }
 
+/** How a code file's exported type bodies read, per adapter language (languageOfFile): the line that opens a body, the line that closes it, and a field inside. A file no language claims has no type bodies read. */
+interface MemberScan {
+  opens: RegExp;
+  closes: RegExp;
+  field: RegExp;
+}
+
+/** Keyed by language, so a language an adapter adds must say how its type bodies read. */
+const MEMBER_SCANS: Record<Language, MemberScan> = {
+  typescript: { opens: /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/, closes: /^[}\]]/, field: /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/ },
+  python: { opens: /^class\s/, closes: /^\S/, field: /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/ },
+};
+
 /**
  * A field an exported type declares: a member of an exported TypeScript
  * interface, type or class, or an annotated field of a top-level Python
  * class. The file's own locals never match.
  */
-function memberName(line: string, inside: boolean, python: boolean): string | undefined {
-  if (!inside) return undefined;
-  const match = python ? /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/.exec(line) : /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/.exec(line);
-  return match?.[1];
+function memberName(line: string, inside: boolean, scan: MemberScan | undefined): string | undefined {
+  if (!inside || scan === undefined) return undefined;
+  return scan.field.exec(line)?.[1];
 }
 
 interface Word {
@@ -342,9 +349,12 @@ function wordRuns(text: string): Word[][] {
   return runs;
 }
 
-/** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
-const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
-
+/**
+ * The written prose of a journal or work record line: every field its role
+ * table (journal/record.ts) calls prose, and a decision's over, whose refused
+ * name is still a use of the words; ids, sessions, commits, paths and states
+ * are not words. A line that will not parse is read whole.
+ */
 export function recordProse(line: string): string[] {
   let value: unknown;
   try {
@@ -352,15 +362,7 @@ export function recordProse(line: string): string[] {
   } catch {
     return [line];
   }
-  const out: string[] = [];
-  const walk = (v: unknown, key: string | undefined): void => {
-    if (key !== undefined && RECORD_METADATA.has(key)) return;
-    if (typeof v === "string") out.push(v);
-    else if (Array.isArray(v)) for (const item of v) walk(item, undefined);
-    else if (v !== null && typeof v === "object") for (const [k, item] of Object.entries(v)) walk(item, k);
-  };
-  walk(value, undefined);
-  return out;
+  return recordWords(value, (role) => role !== "meta");
 }
 
 interface Pool {
@@ -641,7 +643,8 @@ export async function lexiconReading(
     );
     let fenced = false;
     let exported = false;
-    const python = f.rel.endsWith(".py");
+    const language = languageOfFile(f.rel);
+    const scan = language === undefined ? undefined : MEMBER_SCANS[language];
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
@@ -713,11 +716,11 @@ export async function lexiconReading(
           declarations.set(term, sites);
           nominate({ term, spelling: name, proper: false }, use, true);
         }
-        const member = memberName(observed, exported, python);
+        const member = memberName(observed, exported, scan);
         if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, use, true);
         // A body opened by an exported type (or a top-level Python class) holds declared fields until it closes at the margin.
-        if (python ? /^class\s/.test(observed) : /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/.test(observed)) exported = true;
-        else if (python ? /^\S/.test(observed) : /^[}\]]/.test(observed)) exported = false;
+        if (scan?.opens.test(observed)) exported = true;
+        else if (scan?.closes.test(observed)) exported = false;
         continue;
       }
       if (f.kind === "data") continue;
@@ -992,9 +995,14 @@ export interface Attention {
   senses: { term: string; component: string; reason: string; evidence: string; state: string }[];
 }
 
+/** What a sense review may rule about a context. */
+export const DISPOSITIONS = ["confirmed", "not-domain", "deferred", "defect"] as const;
+/** The rulings that settle a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
+const SETTLING: ReadonlySet<string> = new Set<(typeof DISPOSITIONS)[number]>(["confirmed", "not-domain"]);
+
 /** Whether a review has settled a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
 export function isSettled(disposition: string): boolean {
-  return disposition === "confirmed" || disposition === "not-domain";
+  return SETTLING.has(disposition);
 }
 
 /**

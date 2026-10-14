@@ -176,6 +176,40 @@ If you already have a status line, keep it by passing its command after
 `--`: `npx --no -- coherence-statusline -- ~/.claude/statusline.sh` prints
 yours first, then Coherence's.
 
+#### The Claude Code mod: one warm process per session
+
+In Claude Code you can also run Coherence's hooks through its mod instead
+of the settings hooks. The mod starts one Coherence process per session and
+sends it every event, so an event no longer pays Node's start and
+Coherence's module load, about 0.25 s each. In the PostHog monorepo a
+prompt, a read or an edit outside every adopted project drops from about
+260 ms to under 10 ms. The expensive steps (a project's first entry, a stop
+after an edit) cost about the same either way.
+
+The mod also shows Coherence's line in the status line, marks each edit's
+tool row with its check's verdict, and puts a `Scope ↗` button above the
+prompt (or run `/scope`). The agent still gets exactly what the settings
+hooks give it.
+
+```
+npx --no -- coherence hooks install --host claude --mod
+```
+
+This is personal to you in this project. It registers Coherence's repository
+as a Claude Code plugin marketplace and installs the mod from it, both in
+`.claude/settings.local.json`. The mod runs the project's own installed
+Coherence, so it works with whatever version the project uses. It also
+removes your personal Coherence settings hooks, which the mod replaces.
+Committed hooks belong to the team and stay; while they are there, the mod
+leaves the events they cover to them, and install names those events. To
+move the whole team, `hooks install --host claude --mod --shared` enables the
+mod in the committed `.claude/settings.json` in place of the committed Claude
+Code hooks; each teammate is asked to install it at their next session.
+`coherence hooks uninstall --host claude` removes the mod too. Claude Code
+updates the mod with `claude plugin update coherence@coherence`. Codex keeps
+the settings hooks. The measurements and the mod's limits are in
+[docs/mods-spike.md](docs/mods-spike.md).
+
 ### Decisions are never buried in a transcript
 
 The **journal** compresses hundreds of thousands of session tokens into a
@@ -471,6 +505,7 @@ node src/cli.ts run --each                # after the batched pass, each totalit
 node src/cli.ts serve [--language <l>]    # the warm language server for this project and language (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
+node src/cli.ts hooks install --host claude --mod [--shared]   # the mod in place of the settings hooks: yours, or the team's in the committed settings
 node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte
 node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
 node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
@@ -485,7 +520,15 @@ A project names its own lexicon under `lexicon` in `coherence.config.json`
 the concept's retired name is refused with the one-line `git mv` that migrates
 it; the old name is never read. SessionStart and SubagentStart inject
 both layers with a short instruction, the journal read command, and a decision
-write template. This checkout carries hooks for both Claude Code and Codex;
+write template. In Claude Code this checkout runs Coherence through its mod,
+linked from `.claude/skills/coherence` to the tree's own `mods/coherence`:
+every session here, in the main checkout and in each worktree, loads that
+tree's mod and answers its events through one warm process running that
+tree's `src/cli.ts`, and an interactive session reloads the mod when a file
+of it is saved. A copy of the mod installed for this repository or for you
+(`hooks install --mod`, `/plugin install`) would take its name first and run
+instead; the mod says so when it starts, and `hooks --check --host claude`
+names one installed for this repository. Codex keeps its settings hooks in `.codex/hooks.json`.
 `node src/cli.ts hooks status` reports their installation and what each event
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
@@ -555,7 +598,9 @@ runs as `prepare`, so `npm ci`, `npm pack` and an install from the git
 repository all build. `node-llama-cpp` is an optional peer: a project that
 wants the local embedding pass installs it beside Coherence.
 
-To release, merge a change that bumps `version` in package.json into main.
+To release, merge a change that bumps `version` in package.json, and the same
+`version` in `mods/coherence/.claude-plugin/plugin.json` (a test holds them
+equal), into main.
 The Release workflow sees a version npm does not have, publishes it through
 npm trusted publishing from `.github/workflows/release.yml` in the `Release`
 environment, with provenance and no stored token, and tags it as a GitHub
