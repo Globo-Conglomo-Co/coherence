@@ -13,6 +13,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { loadSpecModel, projectPractices } from "../spec/model.ts";
 import { parsePractices, type Practice } from "../spec/practice.ts";
@@ -28,25 +29,53 @@ function git(...args: string[]): { code: number; out: string } {
 
 const normalize = (text: string): string => text.trim().replace(/\s+/g, " ");
 
-/** Each tagged release's kernel practices, by the id an adopter knows them by, as that release's tree wrote them. */
+/** Each blob named `<tag>:<path>`, read through one git cat-file --batch rather than one git show per file. */
+function blobs(names: readonly string[]): Map<string, string> {
+  const ran = spawnSync("git", ["cat-file", "--batch"], { cwd: COHERENCE_ROOT, input: names.map((n) => `${n}\n`).join(""), maxBuffer: 256 * 1024 * 1024 });
+  const out = new Map<string, string>();
+  const bytes = ran.stdout ?? Buffer.alloc(0);
+  let at = 0;
+  for (const name of names) {
+    const end = bytes.indexOf(10, at);
+    const header = bytes.subarray(at, end).toString("utf8").split(" ");
+    at = end + 1;
+    if (header[1] !== "blob") continue;
+    const size = Number(header[2]);
+    out.set(name, bytes.subarray(at, at + size).toString("utf8"));
+    at += size + 1;
+  }
+  return out;
+}
+
+/**
+ * Each tagged release's kernel practices, by the id an adopter knows them by,
+ * as that release's tree wrote them; releases that taught the same practices
+ * word for word are one entry, named by the first of them and their count,
+ * since an adopter of any of them holds the same records.
+ */
 function releasedKernels(current: ReadonlySet<string>): { tag: string; practices: Map<string, Practice> }[] {
   const tags = git("tag", "--list", "v*").out.split("\n").filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
   assert.ok(tags.length > 0, "no release tags in this checkout: the upgrade test reads each release's kernel practices from its tag, so fetch the tags (git fetch --tags, or checkout with fetch-depth: 0)");
-  const out: { tag: string; practices: Map<string, Practice> }[] = [];
-  for (const tag of tags) {
-    const files = git("ls-tree", "-r", "--name-only", tag, "src").out.split("\n").filter((f) => /^src\/[^/]+\/[^/]+\.practice\.md$/.test(f));
+  const listed = tags.map((tag) => ({ tag, files: git("ls-tree", "-r", "--name-only", tag, "src").out.split("\n").filter((f) => /^src\/[^/]+\/[^/]+\.practice\.md$/.test(f)) }));
+  const texts = blobs(listed.flatMap(({ tag, files }) => files.map((file) => `${tag}:${file}`)));
+  const byContent = new Map<string, { tags: string[]; practices: Map<string, Practice> }>();
+  for (const { tag, files } of listed) {
     const practices = new Map<string, Practice>();
     for (const file of files) {
       const folder = file.split("/").slice(0, 2).join("/");
-      for (const p of parsePractices(git("show", `${tag}:${file}`).out, file).practices) {
+      for (const p of parsePractices(texts.get(`${tag}:${file}`) ?? "", file).practices) {
         const id = `${KERNEL_PREFIX}${folder}/${p.name}`;
         // A release before reach: was written shipped every practice; the ones this tree still ships as kernel are the ones an adopter re-enacts.
         if (p.reach !== "internal" && current.has(id)) practices.set(id, p);
       }
     }
-    if (practices.size > 0) out.push({ tag, practices });
+    if (practices.size === 0) continue;
+    const key = JSON.stringify([...practices].sort(([a], [b]) => a.localeCompare(b)));
+    const same = byContent.get(key);
+    if (same === undefined) byContent.set(key, { tags: [tag], practices });
+    else same.tags.push(tag);
   }
-  return out;
+  return [...byContent.values()].map(({ tags: taught, practices }) => ({ tag: taught.length === 1 ? taught[0]! : `${taught[0]!} (and ${taught.length - 1} releases that taught the same)`, practices }));
 }
 
 function adopter(): { root: string; run: (...argv: string[]) => { code: number; out: string; err: string } } {
@@ -75,7 +104,8 @@ function doneSteps(count: number): string[] {
   return Array.from({ length: count }, (_, i) => ["--step", `${i + 1}=done:carried out in the fixture`]).flat();
 }
 
-test("an adopter that enacted every kernel practice as an earlier release taught it re-enacts each and checks clean under this one", () => {
+test("an adopter that enacted every kernel practice as an earlier release taught it re-enacts each and checks clean under this one", (t) => {
+  budget(t, 20, "d-4d6efcf9");
   const { root: probe } = adopter();
   const current = new Map(projectPractices(probe).filter((p) => p.id.startsWith(KERNEL_PREFIX)).map((p) => [p.id, p]));
   rmSync(probe, { recursive: true, force: true });

@@ -29,6 +29,7 @@
  */
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
+import { perProcess } from "../lifecycle/process-caches.ts";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -94,7 +95,7 @@ export function readConfigFile(path: string): Record<string, unknown> | undefine
 
 /** One process asks this of one repository many times in one event; a reading a moment old answers again. */
 const REGISTRY_MS = 2_000;
-const registries = new Map<string, { at: number; mtime: number; registry: Registry | undefined }>();
+const registries = perProcess(new Map<string, { at: number; mtime: number; registry: Registry | undefined }>());
 
 /**
  * The registry of the repository holding `dir`, or undefined when its top's

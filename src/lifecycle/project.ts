@@ -8,6 +8,7 @@
  */
 
 import { spawnSync } from "./work-meter.ts";
+import { perProcess } from "./process-caches.ts";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -261,7 +262,7 @@ export function nestedProjects(dir: string): string[] {
 
 /** How long one listing of the projects below a folder answers again within a process. */
 const NESTED_LISTING_MS = 2_000;
-const nestedListings = new Map<string, { at: number; projects: string[] }>();
+const nestedListings = perProcess(new Map<string, { at: number; projects: string[] }>());
 
 function listNestedProjects(base: string): string[] {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/${CONFIG_FILE}`], { cwd: base, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });

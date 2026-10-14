@@ -11,6 +11,7 @@ import { createConnection, createServer, type Socket } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
+import { budget } from "./test-budgets.ts";
 import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
 import { stopWarmServers } from "./server-fixture.ts";
@@ -84,7 +85,8 @@ test("a client with spawning off fails plainly when nothing listens", async () =
   }
 });
 
-test("the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason", async () => {
+test("the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason", async (t) => {
+  budget(t, 15, "d-4d6efcf9");
   // The totality pass runs the whole suite before the first question, and the warm server's idle timer only
   // resets on a request line. Reviewer A: a suite longer than the idle killed the instrument, every chokepoint
   // recorded not run, and the run exited 0.

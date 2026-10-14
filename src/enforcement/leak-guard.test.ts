@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -60,7 +60,7 @@ function alive(pid: number): boolean {
   }
 }
 
-test("the leak guard fails a test file that leaves a process or a temp folder behind, names each, and passes one that cleans up", { timeout: 120_000 }, () => {
+test("the leak guard fails a test file that leaves a process or a temp folder behind, names each, and passes one that cleans up", { timeout: 120_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), "coherence-leak-guard-"));
   const notes = join(root, "notes");
   const temp = join(root, "temp");
@@ -71,9 +71,19 @@ test("the leak guard fails a test file that leaves a process or a temp folder be
     // The fixture's own runner: NODE_TEST_CONTEXT would make it think it runs inside this one.
     const env: Record<string, string | undefined> = { ...process.env, LEAK_NOTES: notes, TMPDIR: temp };
     delete env["NODE_TEST_CONTEXT"];
-    const run = (file: string) => spawnSync(process.execPath, [`--import=${GUARD}`, "--test", file], { cwd: root, encoding: "utf8", env, timeout: 60_000 });
+    // Each fixture runs in its own node:test run, and the four side by side: each guard looks only for what its own file left.
+    const run = (file: string) =>
+      new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
+        const child = spawn(process.execPath, [`--import=${GUARD}`, "--test", file], { cwd: root, env, timeout: 60_000 });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
+        child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
+        child.on("close", (status) => resolve({ status, stdout, stderr }));
+      });
+    const [named, inherited, folder, clean] = await Promise.all(["named.test.mjs", "inherited.test.mjs", "folder.test.mjs", "clean.test.mjs"].map(run));
 
-    const named = run("named.test.mjs");
+    assert.ok(named !== undefined && inherited !== undefined && folder !== undefined && clean !== undefined);
     const namedPid = Number(readFileSync(join(notes, "named.pid"), "utf8"));
     pids.push(namedPid);
     assert.notEqual(named.status, 0, "a file that leaves a process running fails");
@@ -81,18 +91,15 @@ test("the leak guard fails a test file that leaves a process or a temp folder be
     assert.match(named.stdout, new RegExp(`process ${namedPid}: \\S*node -e setTimeout`), "the process is named with its command line");
     assert.match(named.stdout, /temp folder: \S*coherence-named-/, "the fixture folder is named");
 
-    const inherited = run("inherited.test.mjs");
     const inheritedPid = Number(readFileSync(join(notes, "inherited.pid"), "utf8"));
     pids.push(inheritedPid);
     assert.notEqual(inherited.status, 0, "a detached process found through its environment fails the file");
     assert.match(inherited.stdout, new RegExp(`process ${inheritedPid}: `));
 
-    const folder = run("folder.test.mjs");
     assert.notEqual(folder.status, 0, "a file that keeps a temp folder fails");
     assert.match(folder.stdout, /left 0 process\(es\) and 1 temp folder\(s\) behind/);
     assert.match(folder.stdout, /temp folder: \S*coherence-kept-/);
 
-    const clean = run("clean.test.mjs");
     assert.equal(clean.status, 0, `a file that cleans up passes:\n${clean.stdout}\n${clean.stderr}`);
     assert.doesNotMatch(clean.stdout, /leak guard/);
 

@@ -168,6 +168,38 @@ function shellOption(given: readonly unknown[]): boolean {
   return options !== undefined && options.shell !== undefined && options.shell !== false;
 }
 
+/**
+ * A spawn as a watcher sees it: the program, its arguments (for exec, the one
+ * command string), and the folder it runs in when its options name one.
+ */
+export interface WatchedSpawn {
+  file: string;
+  args: string[];
+  cwd: string | undefined;
+  /** Whether it runs detached: work the spawner starts and lets go, never waits on. */
+  detached: boolean;
+}
+
+const watchers: ((spawn: WatchedSpawn) => void)[] = [];
+
+/**
+ * Hear every spawn this process makes from now on, inside a scope or not, at
+ * the same place the meter counts them: the test suite's leak guard counts
+ * the file's launches of Coherence's own command line with it.
+ */
+export function watchSpawns(watcher: (spawn: WatchedSpawn) => void): void {
+  watchers.push(watcher);
+}
+
+function tellWatchers(given: readonly unknown[]): void {
+  if (watchers.length === 0) return;
+  const args = Array.isArray(given[1]) ? (given[1] as unknown[]).map(String) : [];
+  const options = given.find((a, i) => i > 0 && a !== null && typeof a === "object" && !Array.isArray(a)) as { cwd?: unknown; detached?: unknown } | undefined;
+  const cwd = options?.cwd instanceof URL ? options.cwd.pathname : typeof options?.cwd === "string" ? options.cwd : undefined;
+  const spawn = { file: String(given[0] ?? ""), args, cwd, detached: options?.detached === true };
+  for (const watcher of watchers) watcher(spawn);
+}
+
 function countSpawn(args: readonly unknown[], viaShell = false): void {
   if (current === undefined) return;
   current.counts.spawn += 1;
@@ -250,7 +282,10 @@ function counted(name: string, sync: boolean): void {
     const args = name === "exec" || name === "execSync" ? [String(given[0] ?? "")] : given;
     const call = name === "exec" || name === "execSync" ? given : controlled(given);
     // exec and execSync always run their string through a shell.
-    if (outer) countSpawn(args, name === "exec" || name === "execSync" || shellOption(given));
+    if (outer) {
+      countSpawn(args, name === "exec" || name === "execSync" || shellOption(given));
+      tellWatchers(given);
+    }
     depth += 1;
     try {
       if (!sync && outer) {
@@ -284,7 +319,10 @@ function counted(name: string, sync: boolean): void {
       const args = name === "exec" ? [String(given[0] ?? "")] : given;
       const call = name === "exec" ? given : controlled(given);
       const outer = depth === 0;
-      if (outer) countSpawn(args, name === "exec" || shellOption(given));
+      if (outer) {
+        countSpawn(args, name === "exec" || shellOption(given));
+        tellWatchers(given);
+      }
       depth += 1;
       let result: unknown;
       try {

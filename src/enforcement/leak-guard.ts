@@ -18,14 +18,22 @@
  * leaked is killed and removed after it is named, so a failing file still
  * leaves nothing behind. The file's folder is gone either way.
  *
+ * The same process keeps the unit suite's cost budgets (test-budgets.ts):
+ * every spawn passes the work meter's watch, so a file that launches
+ * Coherence's own command line more than its spawn budget, or reads
+ * Coherence's own tree, fails at exit with each launch or read named by the
+ * test that made it; and every test is timed between hooks on the file's
+ * root, and fails past its ceiling.
+ *
  * Inert in the runner's parent process (no NODE_TEST_CONTEXT), and in any
  * process a test spawns that does not itself load this module.
  */
 
-import { execFileSync } from "../lifecycle/work-meter.ts";
+import { execFileSync, watchSpawns } from "../lifecycle/work-meter.ts";
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { declaredBudget, decisionHeld, describeSpawnBudget, describeTreeReads, launchesOwnCli, overCeiling, readsOwnTree, SPAWN_BUDGET, testCeiling, type Charged } from "./test-budgets.ts";
 
 /** A process the guard found alive: its pid and its command line. */
 export interface LeakedProcess {
@@ -140,7 +148,7 @@ function pause(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function install(): void {
+async function install(): Promise<void> {
   const folder = mkdtempSync(join(tmpdir(), "cg-"));
   process.env["TMPDIR"] = folder;
   process.env["COHERENCE_LEAK_GUARD"] = folder;
@@ -166,6 +174,65 @@ function install(): void {
     }
     rmSync(folder, { recursive: true, force: true });
   });
+  await installBudgets(file);
 }
 
-if (process.env["NODE_TEST_CONTEXT"] !== undefined) install();
+/**
+ * Every test timed between a beforeEach and an afterEach hook on the file's
+ * root, registered here before the file's own code runs, so they wrap every
+ * test the file declares, nested or not, wherever it imports node:test from,
+ * and leave each test's reported file and location its own. The afterEach
+ * fails a test past its ceiling: the unit suite's, or a budget the test
+ * declared with budget(t, seconds, because) citing a decision.
+ */
+/** A test's name with its suites' (node:test's fullName), the key a declared budget is kept under. */
+function fullName(t: { name: string }): string {
+  return (t as { fullName?: string }).fullName ?? t.name;
+}
+
+async function timeTests(charge: { test: string }): Promise<void> {
+  const { afterEach, beforeEach } = await import("node:test");
+  const unit = testCeiling();
+  const started = new Map<string, number>();
+  beforeEach((t) => {
+    charge.test = t.name;
+    started.set(fullName(t), performance.now());
+  });
+  afterEach(async (t) => {
+    const at = started.get(fullName(t));
+    started.delete(fullName(t));
+    if (at === undefined) return;
+    const seconds = (performance.now() - at) / 1000;
+    const declared = declaredBudget(fullName(t));
+    if (declared !== undefined && !(await decisionHeld(declared.because))) {
+      throw new Error(`time budget: "${t.name}" cites ${declared.because}, which is no decision in this repository's journal; record the decision with coherence decide and cite its id`);
+    }
+    if (seconds > (declared?.budget ?? unit)) throw new Error(overCeiling(t.name, seconds, unit, declared));
+  });
+}
+
+/** The spawn budget and the whole-tree rule, kept at exit, and the time ceiling, kept per test (test-budgets.ts). */
+async function installBudgets(file: string): Promise<void> {
+  const charge = { test: "<outside any test>" };
+  const launches: Charged[] = [];
+  const reads: Charged[] = [];
+  const e2e = file.endsWith(".e2e.ts");
+  watchSpawns((spawn) => {
+    const line = [spawn.file, ...spawn.args].join(" ").slice(0, 200);
+    if (launchesOwnCli(spawn)) launches.push({ test: charge.test, line });
+    if (!e2e && readsOwnTree(spawn)) reads.push({ test: charge.test, line });
+  });
+  await timeTests(charge);
+  process.on("exit", () => {
+    if (!e2e && launches.length > SPAWN_BUDGET) {
+      writeSync(2, describeSpawnBudget(file, launches));
+      process.exitCode = 1;
+    }
+    if (reads.length > 0) {
+      writeSync(2, describeTreeReads(file, reads));
+      process.exitCode = 1;
+    }
+  });
+}
+
+if (process.env["NODE_TEST_CONTEXT"] !== undefined) await install();

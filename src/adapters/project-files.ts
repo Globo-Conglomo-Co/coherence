@@ -20,6 +20,7 @@
  */
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
+import { perProcess } from "../lifecycle/process-caches.ts";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
@@ -31,7 +32,7 @@ const GIT_LISTING_LIMIT = 256 * 1024 * 1024;
 /** Pathspecs per git call when asking about named files. */
 const PATHSPEC_BATCH = 400;
 
-const repositoryCache = new Map<string, boolean>();
+const repositoryCache = perProcess(new Map<string, boolean>());
 
 /** Whether git answers for the root: a repository's work tree, at its top or below it. */
 function inRepository(root: string): boolean {

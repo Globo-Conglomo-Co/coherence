@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { fileURLToPath } from "node:url";
 import { runHook, type HookEvent, type HookInput } from "./hook.ts";
 import { closeWork, countWork, lastHookWork, openWork, projectSized as projectSizedLine, type Work } from "./work-meter.ts";
@@ -227,7 +228,8 @@ test("a tool use that writes nothing pays only for its practice files and the jo
   }
 });
 
-test("an edit pays for the files it names, the specs and the history's file lists, at 1× and 10×, wherever the file lies and when it names a protected thing", async () => {
+test("an edit pays for the files it names, the specs and the history's file lists, at 1× and 10×, wherever the file lies and when it names a protected thing", async (t) => {
+  budget(t, 20, "d-4d6efcf9");
   const files: Record<string, { rel: string; line: (n: number) => string }> = {
     "small component": { rel: "src/c1/m.ts", line: (n) => `export const edited${n} = ${n};\n` },
     "large component": { rel: "src/big/part-0.md", line: (n) => `An edit numbered ${n}.\n` },

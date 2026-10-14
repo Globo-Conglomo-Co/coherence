@@ -10,8 +10,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { changedFiles, runHook } from "./hook.ts";
 import { projectRoot } from "./project.ts";
 import { patchFiles } from "../economy/trace.ts";
@@ -19,8 +19,7 @@ import { changedSince } from "../observation/observed.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
-
-const CLI = fileURLToPath(new URL("../cli.ts", import.meta.url));
+import { cli as inProcess } from "./cli-fixture.ts";
 
 const BILLING_SPEC = [
   "# Billing",
@@ -196,11 +195,11 @@ test("a command run at the repository top acts on the one project nested below i
   }
 });
 
-test("hooks install from a nested project writes the host settings at the repository top and in the project, and its ignore file in the project alone", () => {
+test("hooks install from a nested project writes the host settings at the repository top and in the project, and its ignore file in the project alone", async () => {
   const { top, billing } = monorepo({ ".claude/settings.json": JSON.stringify({ permissions: { allow: ["Bash(ls)"] } }, null, 2) + "\n" });
   try {
-    const cli = (...args: string[]) => spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, ...args], { cwd: billing, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
-    const installed = cli("hooks", "install", "--host", "claude", "--command", "npx coherence");
+    const cli = (...args: string[]) => inProcess(args, { cwd: billing, env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
+    const installed = await cli("hooks", "install", "--host", "claude", "--command", "npx coherence");
     assert.equal(installed.status, 0, installed.stderr);
     for (const dir of [top, billing]) {
       const settings = JSON.parse(readFileSync(join(dir, ".claude/settings.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
@@ -209,29 +208,29 @@ test("hooks install from a nested project writes the host settings at the reposi
     assert.deepEqual((JSON.parse(readFileSync(join(top, ".claude/settings.json"), "utf8")) as { permissions: unknown }).permissions, { allow: ["Bash(ls)"] }, "the adopter's own settings at the top are kept");
     assert.ok(existsSync(join(billing, ".coherence/.gitignore")));
     assert.ok(!existsSync(join(top, ".coherence")), "no .coherence at the top");
-    assert.equal(cli("hooks", "--check", "--host", "claude", "--command", "npx coherence").status, 0, "both match what install would write");
-    assert.equal(cli("hooks", "uninstall", "--host", "claude").status, 0);
+    assert.equal((await cli("hooks", "--check", "--host", "claude", "--command", "npx coherence")).status, 0, "both match what install would write");
+    assert.equal((await cli("hooks", "uninstall", "--host", "claude")).status, 0);
     for (const dir of [top, billing]) assert.doesNotMatch(readFileSync(join(dir, ".claude/settings.json"), "utf8"), /coherence hook/, `uninstall removes ours from ${dir}`);
   } finally {
     rmSync(top, { recursive: true, force: true });
   }
 });
 
-test("hooks install --local writes the host's personal settings at the repository top alone, and uninstall removes them", () => {
+test("hooks install --local writes the host's personal settings at the repository top alone, and uninstall removes them", async () => {
   const { top, billing } = monorepo();
   try {
-    const cli = (...args: string[]) => spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, ...args], { cwd: billing, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
+    const cli = (...args: string[]) => inProcess(args, { cwd: billing, env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
     const shared = readFileSync(join(top, ".claude/settings.json"), "utf8");
-    const installed = cli("hooks", "install", "--host", "claude", "--local", "--command", "npx coherence");
+    const installed = await cli("hooks", "install", "--host", "claude", "--local", "--command", "npx coherence");
     assert.equal(installed.status, 0, installed.stderr);
     const local = JSON.parse(readFileSync(join(top, ".claude/settings.local.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
     assert.equal(local.hooks["Stop"]!.at(-1)!.hooks[0]!.command, "npx coherence hook Stop");
     assert.equal(readFileSync(join(top, ".claude/settings.json"), "utf8"), shared, "the committed settings are untouched");
     assert.ok(!existsSync(join(billing, ".claude")), "nothing in the folder's own settings");
     assert.ok(existsSync(join(billing, ".coherence/.gitignore")), "the ignore file as before");
-    assert.equal(cli("hooks", "--check", "--host", "claude", "--local", "--command", "npx coherence").status, 0);
-    assert.notEqual(cli("hooks", "install", "--host", "codex", "--local").status, 0, "a host with no personal settings file is refused");
-    assert.equal(cli("hooks", "uninstall", "--host", "claude").status, 0);
+    assert.equal((await cli("hooks", "--check", "--host", "claude", "--local", "--command", "npx coherence")).status, 0);
+    assert.notEqual((await cli("hooks", "install", "--host", "codex", "--local")).status, 0, "a host with no personal settings file is refused");
+    assert.equal((await cli("hooks", "uninstall", "--host", "claude")).status, 0);
     assert.doesNotMatch(readFileSync(join(top, ".claude/settings.local.json"), "utf8"), /coherence hook/, "uninstall removes ours from the personal settings too");
   } finally {
     rmSync(top, { recursive: true, force: true });
@@ -300,7 +299,8 @@ async function underHorizon(language: "typescript" | "python", references: unkno
   }
 }
 
-test("the reference horizon widens a chokepoint check past the project: a bypass in another folder is found under repository and under a list naming it, and named as not searched under project", { timeout: 240_000 }, async () => {
+test("the reference horizon widens a chokepoint check past the project: a bypass in another folder is found under repository and under a list naming it, and named as not searched under project", { timeout: 240_000 }, async (t) => {
+  budget(t, 20, "d-4d6efcf9");
   for (const language of ["typescript", "python"] as const) {
     const leak = language === "typescript" ? "../../libs/leaky/leak.ts:1" : "../../libs/leaky/leak.py:1";
     const project = await underHorizon(language, undefined);

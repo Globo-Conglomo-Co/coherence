@@ -14,7 +14,9 @@ import { dirname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
+import { budget } from "../enforcement/test-budgets.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
+import { cli } from "./cli-fixture.ts";
 import { hookServer, type ServeAnswer } from "./hook-serve.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -84,13 +86,16 @@ function hookTimeEvents(root: string): string[] {
   return readFileSync(join(root, ".coherence", "hook-times", "spike-parity.jsonl"), "utf8").trim().split("\n").map((line) => (JSON.parse(line) as { event: string }).event);
 }
 
-test("the warm process answers a session's events with the per-event hook's output and keeps the same records", async () => {
+test("the warm process answers a session's events with the per-event hook's output and keeps the same records", async (t) => {
+  budget(t, 20, "d-4d6efcf9");
   const cold = project();
   const warm = project();
-  const viaCli = events(cold).map(({ event, input }) => {
-    const ran = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "hook", event], { cwd: cold, input: JSON.stringify(input), encoding: "utf8", env: quietEnv() });
-    return { stdout: ran.stdout.replaceAll(cold, "<root>"), stderr: ran.stderr.replaceAll(cold, "<root>"), exit: ran.status };
-  });
+  // The per-event hook through cli(), which answers as the spawned binary does (cli.e2e.ts); one event at a time.
+  const viaCli: { stdout: string; stderr: string; exit: number }[] = [];
+  for (const { event, input } of events(cold)) {
+    const ran = await cli(["hook", event], { cwd: cold, stdin: JSON.stringify(input), env: quietEnv() });
+    viaCli.push({ stdout: ran.stdout.replaceAll(cold, "<root>"), stderr: ran.stderr.replaceAll(cold, "<root>"), exit: ran.status });
+  }
 
   const server = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, "hook-serve"], { cwd: warm, env: quietEnv(), stdio: ["pipe", "pipe", "inherit"] });
   const answers: ServeAnswer[] = [];
